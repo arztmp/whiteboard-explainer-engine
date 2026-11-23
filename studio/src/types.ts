@@ -120,6 +120,7 @@ export interface ImageElement extends BaseElement {
 	flipX?: boolean;
 	/** khi enter = draw: vẽ theo trace map <src>.trace.png/.trace.json (tạo offline) */
 	trace?: boolean;
+	illustration?: {regions: {d: string; at: number; end: number}[]};
 	reveal?: {rows?: number};
 	scatter?: {at: number; out: number; hold?: number; back: number; columns?: number; rows?: number;
 		direction?: Vec; returnDirection?: Vec};
@@ -132,6 +133,8 @@ export type FontKind = 'sans' | 'hand';
 
 export interface TextElement extends BaseElement {
 	type: 'text';
+	mode?: 'typography';
+	letterSpacing?: number;
 	text: string;
 	size?: number;
 	weight?: number;
@@ -217,6 +220,7 @@ export interface BarElement extends BaseElement {
 }
 
 export interface PathElement extends BaseElement {
+	inkFade?: {at: number; end: number};
 	type: 'path';
 	d: string;
 	stroke?: string;
@@ -311,6 +315,7 @@ export type TimelineElement =
 	| CaptionElement;
 
 export interface PenTravel {
+	lift?: boolean;
 	scale?: number;
 	/** Absolute timeline seconds and scene coordinates at the offscreen endpoints. */
 	start: number;
@@ -394,6 +399,7 @@ export interface Timeline {
 	/** mở rộng: tự co chữ vừa khung cho label rect/circle, title/body card, text có maxWidth (mặc định false) */
 	fitText?: boolean;
 	sceneSlideLeft?: boolean;
+	theme?: 'brand';
 	scenes: Scene[];
 }
 

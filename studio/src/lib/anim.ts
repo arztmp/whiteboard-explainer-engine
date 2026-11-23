@@ -175,6 +175,9 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		s.scale *= factor;
 	}
 
+	if (el.type === 'path' && el.inkFade)
+		s.opacity *= 1 - easeInOut(progress(t, el.inkFade.at, el.inkFade.end - el.inkFade.at));
+
 	if (s.opacity <= 0.001) s.visible = false;
 	return s;
 };
@@ -191,6 +194,7 @@ export const toScene = (s: ElementState, local: Vec): Vec => {
 };
 
 export interface HandPose {
+	lift?: number;
 	x: number;
 	y: number;
 	opacity: number;
@@ -321,7 +325,8 @@ const travelPen = (items: AnimatedItem[], travel: PenTravel, t: number, fps: num
 	const moveTo = (next: Vec, at: number): HandPose => {
 		const p = easeInOut(progress(t, previousEnd, at - previousEnd));
 		return {x: lerp(previous.x, next.x, p), y: lerp(previous.y, next.y, p),
-			opacity: 1, active: false, startedAt: travel.start};
+			opacity: 1, active: false, startedAt: travel.start,
+			lift: travel.lift ? Math.sin(Math.PI * p) : undefined};
 	};
 	for (const stroke of strokes) {
 		const start = stroke.r.enterAt;

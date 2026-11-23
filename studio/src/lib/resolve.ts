@@ -33,6 +33,7 @@ import {
 } from './rough';
 
 export interface Ctx {
+	brand?: boolean;
 	videoId: string;
 	style: Style;
 	fps: number;
@@ -234,7 +235,7 @@ const computeGeometry = (el: TimelineElement, font: FontKind, ctx: Ctx): Geometr
 				const fit = fitBlocks([{text: el.text, size, weight, lineHeight: lh}], font, el.maxWidth, Infinity, 0, el.maxLines ?? 2);
 				size = fit.blocks[0].size;
 			}
-			const lay = layoutText(el.text, size, weight, font, el.maxWidth, lh);
+			const lay = layoutText(el.text, size, weight, font, el.maxWidth, lh, el.letterSpacing);
 			const pad = textBoxPad(el, size);
 			const w = lay.width + pad.x * 2;
 			const h = lay.height + pad.y * 2;
@@ -465,9 +466,9 @@ export const resolveElement = (
 ): Resolved => {
 	const isC = ctx.style === 'C';
 	const font: FontKind =
-		('font' in el && el.font) || ctx.defaultFont;
+		('font' in el && el.font) || (el.type === 'text' && el.mode === 'typography' ? 'sans' : ctx.defaultFont);
 	const enter: EnterType =
-		el.enter ??
+		el.enter ?? (el.type === 'text' && el.mode === 'typography' ? 'none' : undefined) ??
 		(isC && DRAWABLE_DEFAULT_C
 			? 'draw'
 			: el.type === 'bar'
@@ -477,7 +478,7 @@ export const resolveElement = (
 					: 'fade');
 	// Style A: không bao giờ hiện tay. Style C: mặc định có tay.
 	const hand =
-		enter === 'draw' &&
+		enter === 'draw' && !(el.type === 'text' && el.mode === 'typography') &&
 		(ctx.style === 'A' ? false : (el.hand ?? (isC ? true : false)));
 	const geom = computeGeometry(el, font, ctx);
 	const defaultDur =

@@ -115,8 +115,16 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				e.from.length < 3 || e.from.length !== e.to.length ||
 				![...e.from, ...e.to].every(validPoint) || !positive(e.duration) || !Number.isFinite(e.at)))
 				errs.push(`${w}: morph needs equally sized finite contours and a positive duration`);
+			if (e.type === 'path' && e.inkFade && (!Number.isFinite(e.inkFade.at) || !Number.isFinite(e.inkFade.end) ||
+				e.inkFade.end < e.inkFade.at || e.inkFade.at < (e.enterAt ?? s.start) + (e.enterDuration ?? 0) - .000002))
+				errs.push(`${w}: inkFade requires a valid interval after the pen stroke`);
+
 			if (e.type === 'image') {
-				const {reveal, scatter} = e;
+				const {reveal, scatter, illustration} = e;
+				if (illustration && (e.enter !== 'none' || reveal || scatter || e.trace || e.video ||
+					!Array.isArray(illustration.regions) || !illustration.regions.length ||
+					illustration.regions.some((r) => !r.d || !Number.isFinite(r.at) || !Number.isFinite(r.end) || r.at >= r.end)))
+					errs.push(`${w}: illustration needs independent, timed color regions`);
 				if (reveal && (scatter || e.trace || e.video || e.enter !== 'draw' ||
 					(reveal.rows !== undefined && (!Number.isInteger(reveal.rows) || !positive(reveal.rows)))))
 					errs.push(`${w}: reveal requires draw and a positive row count`);

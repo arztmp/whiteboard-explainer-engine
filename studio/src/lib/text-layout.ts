@@ -43,11 +43,14 @@ export const layoutText = (
 	font: FontKind,
 	maxWidth: number | undefined,
 	lineHeightMul: number,
+	letterSpacing = 0,
 ): TextLayout => {
-	const key = [text, size, weight, font, maxWidth ?? 0, lineHeightMul].join('|');
+	const key = [text, size, weight, font, maxWidth ?? 0, lineHeightMul, letterSpacing].join('|');
 	const hit = cache.get(key);
 	if (hit) return hit;
 	const lines: TextLine[] = [];
+	const widthOf = (value: string) => measureWidth(value, size, weight, font) +
+		Math.max(value.length - 1, 0) * letterSpacing;
 	for (const para of text.split('\n')) {
 		const words = para.split(/\s+/).filter(Boolean);
 		if (words.length === 0) {
@@ -57,14 +60,14 @@ export const layoutText = (
 		let cur = words[0];
 		for (let i = 1; i < words.length; i++) {
 			const cand = `${cur} ${words[i]}`;
-			if (maxWidth && measureWidth(cand, size, weight, font) > maxWidth) {
-				lines.push({text: cur, width: measureWidth(cur, size, weight, font)});
+			if (maxWidth && widthOf(cand) > maxWidth) {
+				lines.push({text: cur, width: widthOf(cur)});
 				cur = words[i];
 			} else {
 				cur = cand;
 			}
 		}
-		lines.push({text: cur, width: measureWidth(cur, size, weight, font)});
+		lines.push({text: cur, width: widthOf(cur)});
 	}
 	const lineHeight = size * lineHeightMul;
 	const layout: TextLayout = {

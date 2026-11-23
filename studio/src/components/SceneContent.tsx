@@ -1,3 +1,4 @@
+import {IllustrationView} from './elements/IllustrationView';
 import {MorphView, SpecialImageView} from './elements/ImageEffects';
 import React, {useMemo} from 'react';
 import {Img} from 'remotion';
@@ -26,6 +27,7 @@ const ElementBody: React.FC<{r: Resolved; s: ElementState; ctx: Ctx; t: number}>
 	const props = {r, s, ctx, t} as any;
 	switch (r.el.type) {
 		case 'image':
+			if (r.el.illustration) return <IllustrationView {...props} />;
 			return r.el.reveal || r.el.scatter ? <SpecialImageView {...props} /> : <ImageView {...props} />;
 		case 'morph':
 			return <MorphView {...props} />;
@@ -106,6 +108,8 @@ export const SceneContent: React.FC<{
 					top: pose.y - hand.tip.y * scale,
 					width: nat.w * scale,
 					height: nat.h * scale,
+					transform: pose.lift ? `rotate(${6 * pose.lift}deg) scale(${1 - .06 * pose.lift})` : undefined,
+					transformOrigin: pose.lift ? `${hand.tip.x * scale}px ${hand.tip.y * scale}px` : undefined,
 					opacity: pose.opacity,
 					pointerEvents: 'none',
 				}}

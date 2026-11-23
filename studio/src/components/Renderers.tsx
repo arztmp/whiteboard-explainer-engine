@@ -1,3 +1,4 @@
+import brand from '../theme.json';
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Img} from 'remotion';
 import {animateCarry, toScene} from '../lib/anim';
@@ -40,7 +41,7 @@ const SceneLayer: React.FC<{
 }> = ({scene, tl, ctx, t, fontsOk, wrapper, cam, hideHands}) => {
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
 	return (
-		<AbsoluteFill data-scene={scene.id} style={{background: scene.background ?? tl.background ?? '#F7F8FA', overflow: 'hidden', ...wrapper}}>
+		<AbsoluteFill data-scene={scene.id} style={{background: scene.background ?? tl.background ?? (ctx.brand ? brand.white : '#F7F8FA'), overflow: 'hidden', ...wrapper}}>
 			<div
 				style={{
 					position: 'absolute',
@@ -255,7 +256,7 @@ export const Board: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: boolea
 	const tile = 256 * cam.scale;
 	const noiseOn = tl.paperNoise ?? true;
 	return (
-		<AbsoluteFill style={{background: tl.background ?? '#FCFCFA', overflow: 'hidden'}}>
+		<AbsoluteFill style={{background: tl.background ?? (ctx.brand ? brand.white : '#FCFCFA'), overflow: 'hidden'}}>
 			{noise && noiseOn ? (
 				<>
 					<Img src={noise} style={{position: 'absolute', width: 1, height: 1, opacity: 0}} />

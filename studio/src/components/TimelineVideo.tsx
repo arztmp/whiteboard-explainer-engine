@@ -1,3 +1,4 @@
+import brand from '../theme.json';
 import React, {useEffect, useMemo, useState} from 'react';
 import {AbsoluteFill, cancelRender, continueRender, delayRender, Html5Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {FONT_SANS, fontsReady, loadFonts} from '../fonts';
@@ -34,6 +35,7 @@ export const TimelineVideo: React.FC<VideoProps> = ({videoId, timelineFile, time
 				? {
 						videoId,
 						style: timeline.style,
+						brand: timeline.theme === 'brand',
 						fps,
 						imageSizes: imageSizes ?? {},
 						traces: traces ?? {},
@@ -71,7 +73,7 @@ export const TimelineVideo: React.FC<VideoProps> = ({videoId, timelineFile, time
 	}
 	const t = frame / fps;
 	return (
-		<AbsoluteFill style={{background: timeline.background ?? (timeline.style === 'C' ? '#FCFCFA' : '#F7F8FA')}}>
+		<AbsoluteFill style={{background: timeline.background ?? (timeline.theme === 'brand' ? brand.white : undefined) ?? (timeline.style === 'C' ? '#FCFCFA' : '#F7F8FA')}}>
 			{timeline.audio ? (
 				<Html5Audio src={resolveAsset(videoId, timeline.audio)} volume={timeline.audioVolume ?? 1} />
 			) : null}
