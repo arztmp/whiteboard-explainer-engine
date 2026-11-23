@@ -23,9 +23,10 @@ actual = (probe["width"], probe["height"], probe["avg_frame_rate"], float(probe[
 assert actual == (1920, 1080, "30/1", 118, 3540), actual
 run("ffmpeg", "-v", "error", "-xerror", "-i", str(video), "-f", "null", "-")
 comparison = {}
-with Image.open(out / "original-comparison.png") as sheet:
-    for name, (final, reference) in browser["pixelRects"].items():
-        a, b = np.asarray(sheet.crop(final), dtype=np.int16), np.asarray(sheet.crop(reference), dtype=np.int16)
+with Image.open(out / "original-comparison.png") as completed, Image.open(out / "registered-original.png") as source:
+    for name, (final, _) in browser["pixelRects"].items():
+        a = np.asarray(completed.crop(final), dtype=np.int16)
+        b = np.asarray(source.crop(final), dtype=np.int16)
         difference = np.abs(a - b)
         count = int(np.count_nonzero(np.any(difference, axis=-1)))
         assert count == 0, (name, count)

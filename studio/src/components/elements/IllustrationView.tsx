@@ -1,13 +1,13 @@
 import React, {useId} from 'react';
-import {Img} from 'remotion';
 import {resolveAsset} from '../../lib/assets';
 import {easeInOut, progress} from '../../lib/math';
 import {SvgImage} from '../SvgImage';
 import type {ImageElement} from '../../types';
-import type {ElProps} from './index';
+import {ImageView, type ElProps} from './index';
 
 /** The mask colors only locally scheduled regions. Pen lines are real path elements. */
-export const IllustrationView: React.FC<ElProps<ImageElement>> = ({r, t, ctx}) => {
+export const IllustrationView: React.FC<ElProps<ImageElement>> = (props) => {
+	const {r, t, ctx} = props;
 	const {el, geom} = r;
 	const {w, h, ox, oy} = geom.box;
 	const src = resolveAsset(ctx.videoId, el.src);
@@ -15,7 +15,9 @@ export const IllustrationView: React.FC<ElProps<ImageElement>> = ({r, t, ctx}) =
 	const regions = el.illustration!.regions;
 	const done = regions.every((region) => t >= region.end);
 	const style = {position: 'absolute' as const, left: ox, top: oy, width: w, height: h};
-	if (done) return <Img src={src} style={style} data-illustration-final />;
+	if (done) {
+		return <div data-illustration-final><ImageView {...props} /></div>;
+	}
 	return (
 		<svg width={w} height={h} viewBox="0 0 1 1" preserveAspectRatio="none" style={style} data-illustration-regions>
 			<defs>

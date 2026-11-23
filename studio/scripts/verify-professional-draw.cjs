@@ -154,9 +154,25 @@ async function main() {
 				return [box.left,box.top,box.right,box.bottom].map(Math.floor);
 			}),
 		])));
-		const {value: {data: png}} = await page._client().send('Page.captureScreenshot',{format:'png'});
-		assert(typeof png === 'string' && png.length > 100, 'missing comparison screenshot');
-		await writeFile(join(out,'original-comparison.png'),Buffer.from(png,'base64'));
+		const snapshot = async (file) => {
+			const {value: {data}} = await page._client().send('Page.captureScreenshot',{format:'png'});
+			assert(typeof data === 'string' && data.length > 100, 'missing comparison screenshot');
+			await writeFile(join(out,file),Buffer.from(data,'base64'));
+		};
+		await snapshot('original-comparison.png');
+		// Chromium can snap SVG anti-aliasing differently at different surface positions.
+		// Put the independent source nodes at the exact same viewport positions for the pixel test.
+		await page.evaluate(() => {
+			for (const name of ['robot','rover','svg']) {
+				const final = document.querySelector(`[data-el="finished-${name}"]`);
+				const original = document.querySelector(`[data-el="original-${name}"]`);
+				original.style.left = final.style.left;
+				original.style.top = final.style.top;
+				final.style.visibility = 'hidden';
+			}
+		});
+		await snapshot('registered-original.png');
+
 		await writeFile(join(out,'coordinates.csv'),csv.join('\n')+'\n');
 		await writeFile(join(out,'browser-verification.json'),JSON.stringify({
 			frames: comp.durationInFrames, groups,transitionFrames,pixelRects,

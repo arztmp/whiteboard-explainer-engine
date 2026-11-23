@@ -104,7 +104,7 @@ add("close-up", "Yakın plan · Kalemin temas ve kalkış anları", 7, detail, p
 
 compare = []
 for name, middle, width, y, offset in (("robot", 490, 300, 504, 150), ("rover", 1420, 382, 504, 208),
-                                        ("svg", 960, 285, 885, 165)):
+                                        ("svg", 960, 224, 885, 165)):
     original = reproduce[name]
     panel = dict(original, id=f"finished-{name}", x=middle-offset, y=y, w=width,
                  h=original["h"]*width/original["w"], enterAt=clock)
