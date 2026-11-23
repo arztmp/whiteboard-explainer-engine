@@ -52,7 +52,7 @@ const SceneLayer: React.FC<{
 				}}
 			>
 				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="elements" />
-				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" hand={tl.hand} carryHand={tl.carryHand} />
+				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />
 			</div>
 		</AbsoluteFill>
 	);
@@ -163,7 +163,7 @@ const BoardScene: React.FC<{
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
 	return (
 		<div style={{position: 'absolute', left: origin.x, top: origin.y, width: tl.width, height: tl.height}}>
-			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} hand={tl.hand} carryHand={tl.carryHand} />
+			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />
 		</div>
 	);
 };

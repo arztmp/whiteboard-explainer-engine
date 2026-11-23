@@ -1,0 +1,530 @@
+{
+  "style": "A",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 30,
+  "background": "#FAF9F1",
+  "font": "sans",
+  "hand": {
+    "src": "Kalem_El.png",
+    "tip": {
+      "x": 98.5,
+      "y": 291.5
+    },
+    "scale": 0.42
+  },
+  "carryHand": {
+    "src": "El.png",
+    "tip": {
+      "x": 378.5,
+      "y": 133.5
+    },
+    "scale": 0.37
+  },
+  "scenes": [
+    {
+      "id": "write",
+      "start": 0,
+      "end": 10,
+      "transitionIn": {
+        "type": "none"
+      },
+      "elements": [
+        {
+          "id": "write-kicker",
+          "type": "text",
+          "text": "EL ANİMASYONU TESTİ",
+          "x": 960,
+          "y": 105,
+          "size": 22,
+          "color": "#31756A",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "write-title",
+          "type": "text",
+          "text": "Yazı yazma",
+          "x": 960,
+          "y": 171,
+          "size": 54,
+          "color": "#183746",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "write-line",
+          "type": "rect",
+          "x": 960,
+          "y": 252,
+          "w": 1510,
+          "h": 2,
+          "fill": "#CCDCD3",
+          "stroke": "none",
+          "enter": "none"
+        },
+        {
+          "id": "ink-text-00",
+          "type": "path",
+          "d": "M265 427 L265 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 1.1,
+          "enterDuration": 0.228212,
+          "rough": false
+        },
+        {
+          "id": "ink-text-01",
+          "type": "path",
+          "d": "M367 427 L367 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 1.428212,
+          "enterDuration": 0.228212,
+          "rough": false
+        },
+        {
+          "id": "ink-text-02",
+          "type": "path",
+          "d": "M265 500 L367 500",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 1.756424,
+          "enterDuration": 0.155184,
+          "rough": false
+        },
+        {
+          "id": "ink-text-03",
+          "type": "path",
+          "d": "M495 427 L393 427 L393 577 L495 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 2.011608,
+          "enterDuration": 0.53858,
+          "rough": false
+        },
+        {
+          "id": "ink-text-04",
+          "type": "path",
+          "d": "M393 499 L477 499",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 2.650189,
+          "enterDuration": 0.127799,
+          "rough": false
+        },
+        {
+          "id": "ink-text-05",
+          "type": "path",
+          "d": "M521 427 L521 577 L623 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 2.877987,
+          "enterDuration": 0.383396,
+          "rough": false
+        },
+        {
+          "id": "ink-text-06",
+          "type": "path",
+          "d": "M649 427 L649 577 L751 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 3.361383,
+          "enterDuration": 0.383396,
+          "rough": false
+        },
+        {
+          "id": "ink-text-07",
+          "type": "path",
+          "d": "M828 427 L800 433 L783 463 L777 505 L785 547 L806 572 L833 577 L859 562 L876 530 L879 487 L869 450 L847 430 L828 427",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 3.84478,
+          "enterDuration": 0.616263,
+          "rough": false
+        },
+        {
+          "id": "ink-text-08",
+          "type": "path",
+          "d": "M1022 427 L1046 577 L1076 468 L1104 577 L1132 427",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 4.561042,
+          "enterDuration": 0.806487,
+          "rough": false
+        },
+        {
+          "id": "ink-text-09",
+          "type": "path",
+          "d": "M1201 427 L1173 433 L1156 463 L1150 505 L1158 547 L1179 572 L1206 577 L1232 562 L1249 530 L1252 487 L1242 450 L1220 430 L1201 427",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 5.46753,
+          "enterDuration": 0.616263,
+          "rough": false
+        },
+        {
+          "id": "ink-text-10",
+          "type": "path",
+          "d": "M1278 577 L1278 427 L1339 427 L1368 438 L1380 457 L1378 480 L1361 498 L1339 505 L1278 505",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 6.183792,
+          "enterDuration": 0.60312,
+          "rough": false
+        },
+        {
+          "id": "ink-text-11",
+          "type": "path",
+          "d": "M1333 505 L1380 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 6.886912,
+          "enterDuration": 0.130815,
+          "rough": false
+        },
+        {
+          "id": "ink-text-12",
+          "type": "path",
+          "d": "M1406 427 L1406 577 L1508 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 7.117727,
+          "enterDuration": 0.383396,
+          "rough": false
+        },
+        {
+          "id": "ink-text-13",
+          "type": "path",
+          "d": "M1534 577 L1534 427 L1574 427 L1603 440 L1625 464 L1636 499 L1630 532 L1612 560 L1580 576 L1534 577",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 7.601123,
+          "enterDuration": 0.668877,
+          "rough": false
+        }
+      ],
+      "penTravel": {
+        "start": 0.18,
+        "end": 9.88,
+        "to": {
+          "x": 1050,
+          "y": 1245
+        },
+        "from": {
+          "x": 1050,
+          "y": 1245
+        }
+      }
+    },
+    {
+      "id": "draw",
+      "start": 10,
+      "end": 20,
+      "transitionIn": {
+        "type": "none"
+      },
+      "elements": [
+        {
+          "id": "draw-kicker",
+          "type": "text",
+          "text": "EL ANİMASYONU TESTİ",
+          "x": 960,
+          "y": 105,
+          "size": 22,
+          "color": "#31756A",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "draw-title",
+          "type": "text",
+          "text": "Ev çizimi",
+          "x": 960,
+          "y": 171,
+          "size": 54,
+          "color": "#183746",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "draw-line",
+          "type": "rect",
+          "x": 960,
+          "y": 252,
+          "w": 1510,
+          "h": 2,
+          "fill": "#CCDCD3",
+          "stroke": "none",
+          "enter": "none"
+        },
+        {
+          "id": "ink-house-00",
+          "type": "path",
+          "d": "M722 562 L722 841 L1175 841 L1175 562",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 11.1,
+          "enterDuration": 1.856514,
+          "rough": false
+        },
+        {
+          "id": "ink-house-01",
+          "type": "path",
+          "d": "M665 566 L948 325 L1232 566 L665 566",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 13.186514,
+          "enterDuration": 2.40775,
+          "rough": false
+        },
+        {
+          "id": "ink-house-02",
+          "type": "path",
+          "d": "M912 841 L912 684 L1006 684 L1006 841",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 15.824264,
+          "enterDuration": 0.749216,
+          "rough": false
+        },
+        {
+          "id": "ink-house-03",
+          "type": "path",
+          "d": "M786 622 L869 622 L869 709 L786 709 L786 622",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 16.80348,
+          "enterDuration": 0.624347,
+          "rough": false
+        },
+        {
+          "id": "ink-house-04",
+          "type": "path",
+          "d": "M826 622 L826 709",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 17.657827,
+          "enterDuration": 0.159759,
+          "rough": false
+        },
+        {
+          "id": "ink-house-05",
+          "type": "path",
+          "d": "M786 666 L869 666",
+          "stroke": "#152F44",
+          "strokeWidth": 8,
+          "hand": true,
+          "enter": "draw",
+          "enterAt": 18.047586,
+          "enterDuration": 0.152414,
+          "rough": false
+        }
+      ],
+      "penTravel": {
+        "start": 10.18,
+        "end": 19.880000000000003,
+        "to": {
+          "x": 1050,
+          "y": 1245
+        },
+        "from": {
+          "x": 1050,
+          "y": 1245
+        }
+      }
+    },
+    {
+      "id": "drag",
+      "start": 20,
+      "end": 30,
+      "transitionIn": {
+        "type": "none"
+      },
+      "elements": [
+        {
+          "id": "drag-kicker",
+          "type": "text",
+          "text": "EL ANİMASYONU TESTİ",
+          "x": 960,
+          "y": 105,
+          "size": 22,
+          "color": "#31756A",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "drag-title",
+          "type": "text",
+          "text": "Yüzeyde sürükleme",
+          "x": 960,
+          "y": 171,
+          "size": 54,
+          "color": "#183746",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "drag-line",
+          "type": "rect",
+          "x": 960,
+          "y": 252,
+          "w": 1510,
+          "h": 2,
+          "fill": "#CCDCD3",
+          "stroke": "none",
+          "enter": "none"
+        },
+        {
+          "id": "drag-rail",
+          "type": "rect",
+          "x": 960,
+          "y": 668,
+          "w": 980,
+          "h": 6,
+          "fill": "#D3E1DA",
+          "stroke": "none",
+          "enter": "none"
+        },
+        {
+          "id": "drag-from",
+          "type": "rect",
+          "x": 460,
+          "y": 668,
+          "w": 280,
+          "h": 201,
+          "fill": "#E5EEE7",
+          "stroke": "#CBDDD2",
+          "enter": "none",
+          "radius": 28,
+          "strokeWidth": 3
+        },
+        {
+          "id": "drag-to",
+          "type": "rect",
+          "x": 1435,
+          "y": 668,
+          "w": 280,
+          "h": 201,
+          "fill": "#DCEEE5",
+          "stroke": "#9CC4B1",
+          "enter": "none",
+          "radius": 28,
+          "strokeWidth": 3
+        },
+        {
+          "id": "drag-from-label",
+          "type": "text",
+          "text": "BAŞLANGIÇ",
+          "x": 460,
+          "y": 842,
+          "size": 25,
+          "color": "#56716D",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "drag-to-label",
+          "type": "text",
+          "text": "HEDEF",
+          "x": 1435,
+          "y": 842,
+          "size": 25,
+          "color": "#327365",
+          "weight": 700,
+          "enter": "none",
+          "hand": false
+        },
+        {
+          "id": "drag-object",
+          "type": "rect",
+          "x": 460,
+          "y": 668,
+          "w": 230,
+          "h": 152,
+          "fill": "#E8AA51",
+          "stroke": "#835222",
+          "enter": "none",
+          "radius": 26,
+          "strokeWidth": 4,
+          "label": "NESNE",
+          "labelSize": 34,
+          "labelColor": "#5D391C",
+          "scale": 1.03,
+          "rotate": 0,
+          "carry": {
+            "mode": "drag",
+            "grip": {
+              "x": 61,
+              "y": -39
+            },
+            "target": {
+              "x": 1435,
+              "y": 668
+            },
+            "to": {
+              "x": 1050,
+              "y": 1245
+            },
+            "start": 20.18,
+            "contact": 22.25,
+            "pickup": 22.67,
+            "land": 26.85,
+            "release": 27.25,
+            "end": 29.6,
+            "from": {
+              "x": 1050,
+              "y": 1245
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

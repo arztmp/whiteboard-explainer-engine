@@ -61,6 +61,7 @@ export interface TransitionIn {
 }
 
 export interface Carry {
+	mode?: 'carry' | 'drag';
 	/** Scene-local positions. The target is the element anchor, grip is relative to that anchor. */
 	grip: Vec;
 	from: Vec;
@@ -283,7 +284,17 @@ export type TimelineElement =
 	| ClockElement
 	| CaptionElement;
 
+export interface PenTravel {
+	/** Absolute timeline seconds and scene coordinates at the offscreen endpoints. */
+	start: number;
+	end: number;
+	from: Vec;
+	to: Vec;
+}
+
 export interface Scene {
+	/** Smooth entry, pen-up moves between path strokes, and exit. */
+	penTravel?: PenTravel;
 	id: string;
 	start: number;
 	end: number;

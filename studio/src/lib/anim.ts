@@ -1,6 +1,6 @@
 // Trạng thái animation của 1 element tại thời điểm t (giây tuyệt đối). Hàm thuần.
 import {spring} from 'remotion';
-import type {Vec} from '../types';
+import type {PenTravel, Vec} from '../types';
 import {clamp, easeDraw, easeIn, easeInOut, easeOut, lerp, progress} from './math';
 import type {Resolved} from './resolve';
 
@@ -234,11 +234,12 @@ export const animateCarry = (r: Resolved, t: number, fps: number, base = compute
 	if (!c || t < c.start) return {state: base, hand: null};
 	const between = (a: number, b: number) => easeInOut(progress(t, a, b - a));
 	const state = {...base};
+	const drag = c.mode === 'drag';
 	if (t >= c.pickup) {
 		const start = computeState(r, c.pickup, fps);
 		const p = between(c.pickup, c.land);
 		state.x = lerp(start.x + Number(start.dx.toFixed(2)), c.target.x, p);
-		state.y = lerp(start.y + Number(start.dy.toFixed(2)), c.target.y, p) - (c.lift ?? 95) * 4 * p * (1 - p);
+		state.y = lerp(start.y + Number(start.dy.toFixed(2)), c.target.y, p) - (drag ? 0 : (c.lift ?? 95)) * 4 * p * (1 - p);
 		state.dx = 0;
 		state.dy = 0;
 	}
@@ -246,7 +247,7 @@ export const animateCarry = (r: Resolved, t: number, fps: number, base = compute
 
 	const grip = carryGrip(state, c.grip);
 	const pose = (phase: CarryHandPose['phase'], closed: number, rotate: number, point = grip) =>
-		({state, hand: {...point, phase, closed, rotate}});
+		({state, hand: {...point, phase, closed: drag ? 0 : closed, rotate: drag ? 0 : rotate}});
 	const mix = (from: Vec, to: Vec, p: number): Vec =>
 		({x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p)});
 	if (t < c.contact) {
@@ -270,5 +271,46 @@ export const animateCarry = (r: Resolved, t: number, fps: number, base = compute
 	return pose('exit', 0, lerp(4, 18, p), mix(carryGrip(atRelease, c.grip), c.to, p));
 };
 
-export const selectSceneHand = (carry: CarryHandPose | null, drawing: HandPose[]) =>
-	carry ? {kind: 'carry' as const, pose: carry} : {kind: 'draw' as const, pose: pickHand(drawing)};
+type AnimatedItem = {r: Resolved; state: ElementState; hand: CarryHandPose | null};
+
+const travelPen = (items: AnimatedItem[], travel: PenTravel, t: number, fps: number): HandPose | null => {
+	if (t < travel.start || t >= travel.end) return null;
+	const strokes = items.filter(({r}) => r.el.hand === true && r.enter === 'draw' && r.el.type === 'path')
+		.sort((a, b) => a.r.enterAt - b.r.enterAt);
+	if (!strokes.length) return null;
+
+	const tipAt = ({r, state}: AnimatedItem, p: number, at: number): Vec => {
+		const path = r.geom.path!;
+		const tip = path.exactPointAt(path.length * p);
+		const local = {x: tip.x - path.bbox.x - path.bbox.w / 2, y: tip.y - path.bbox.y - path.bbox.h / 2};
+		return carryGrip(at === t ? state : computeState(r, at, fps), local);
+	};
+
+	let previous = travel.from;
+	let previousEnd = travel.start;
+	const moveTo = (next: Vec, at: number): HandPose => {
+		const p = easeInOut(progress(t, previousEnd, at - previousEnd));
+		return {x: lerp(previous.x, next.x, p), y: lerp(previous.y, next.y, p),
+			opacity: 1, active: false, startedAt: travel.start};
+	};
+	for (const stroke of strokes) {
+		const start = stroke.r.enterAt;
+		const end = start + stroke.r.enterDur;
+		if (t < start) return moveTo(tipAt(stroke, 0, start), start);
+		if (t <= end) return {...tipAt(stroke, stroke.state.draw ?? 1, t), opacity: 1, active: true, startedAt: start};
+		previous = tipAt(stroke, 1, end);
+		previousEnd = end;
+	}
+	return moveTo(travel.to, travel.end);
+};
+
+/** One frame sample drives the drawing, any attached object, and the scene's only hand. */
+export const sampleSceneAnimation = (resolved: Resolved[], t: number, fps: number, penTravel?: PenTravel) => {
+	const items = resolved.map((r, i) => ({r, i, ...animateCarry(r, t, fps)}))
+		.sort((a, b) => (a.r.el.z ?? 0) - (b.r.el.z ?? 0) || a.i - b.i);
+	const carry = items.find((item) => item.hand)?.hand;
+	if (carry) return {items, hand: {kind: 'carry' as const, pose: carry}};
+	const pose = penTravel ? travelPen(items, penTravel, t, fps)
+		: pickHand(items.map(({r, state}) => handPose(r, state, t)).filter((p): p is HandPose => p !== null));
+	return {items, hand: {kind: 'draw' as const, pose}};
+};

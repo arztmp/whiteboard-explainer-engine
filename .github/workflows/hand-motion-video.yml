@@ -1,0 +1,75 @@
+name: Three hand motions video
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/three-hand-motions]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ARTIFACT_DIR: ${{ runner.temp }}/hand-motion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Run existing Python tests
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pytest -q
+      - name: Install FFmpeg and select runner Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg
+          browser=$(command -v google-chrome || command -v chromium)
+          printf 'CHROME_PATH=%s\n' "$browser" >> "$GITHUB_ENV"
+      - name: Install Remotion and check types
+        working-directory: studio
+        run: |
+          npm ci
+          npm run typecheck
+      - name: Verify contact and determinism across the composition
+        working-directory: studio
+        run: node scripts/verify-hand-motion.cjs "$ARTIFACT_DIR"
+      - name: Render all three scenes
+        working-directory: studio
+        run: |
+          npm run render -- C "$ARTIFACT_DIR/hand-motion.mp4" \
+            --props='{"videoId":"hand-motion-demo","timelineFile":"timeline.json"}' \
+            --browser-executable="$CHROME_PATH" --concurrency=2 --timeout=120000
+      - name: Verify media and extract sample frames
+        run: |
+          video="$ARTIFACT_DIR/hand-motion.mp4"
+          properties=$(ffprobe -v error -select_streams v:0 -show_entries \
+            stream=codec_name,width,height,avg_frame_rate,duration,nb_frames -of json "$video")
+          jq -e '.streams | length == 1 and (.[0] |
+            .codec_name == "h264" and .width == 1920 and .height == 1080 and
+            .avg_frame_rate == "30/1" and .nb_frames == "900" and
+            (.duration | tonumber) == 30)' <<< "$properties"
+          ffmpeg -v error -xerror -i "$video" -f null -
+          filter="select='eq(n,20)+eq(n,145)+eq(n,260)+eq(n,299)+eq(n,320)+eq(n,422)+eq(n,532)+eq(n,599)+eq(n,674)+eq(n,753)+eq(n,838)+eq(n,899)'"
+          mkdir -p "$ARTIFACT_DIR/frames"
+          ffmpeg -v error -i "$video" -vf "$filter" -fps_mode vfr -threads 1 "$ARTIFACT_DIR/frames/%02d.png"
+          ffmpeg -v error -i "$video" -vf "$filter,scale=480:270,tile=4x3" \
+            -frames:v 1 -threads 1 -update 1 "$ARTIFACT_DIR/sample-frames.png"
+          test "$(find "$ARTIFACT_DIR/frames" -name '*.png' | wc -l)" -eq 12
+      - name: Upload video, sample frames and measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: hand-motion
+          path: ${{ runner.temp }}/hand-motion
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

@@ -56,6 +56,31 @@ export const validateTimeline = (tl: Timeline): string[] => {
 			if (s.transitionIn.fromElement && !prev.elements.some((e) => e.id === s.transitionIn!.fromElement))
 				errs.push(`${where}: fromElement "${s.transitionIn.fromElement}" không có ở scene trước`);
 		}
+		const travel = s.penTravel;
+		if (travel) {
+			if (!tl.hand || !validPoint(travel.from) || !validPoint(travel.to) ||
+				!Number.isFinite(travel.start) || !Number.isFinite(travel.end) ||
+				travel.start < s.start || travel.end > s.end || travel.end > tl.duration || travel.start >= travel.end)
+				errs.push(`${where}: penTravel requires a hand, finite endpoints and a time range inside the scene`);
+			const strokes = (s.elements ?? []).filter((e) => e.hand).sort((a, b) => (a.enterAt ?? 0) - (b.enterAt ?? 0));
+			if (!strokes.length) errs.push(`${where}: penTravel requires at least one pen stroke`);
+			let previousEnd = travel.start;
+			for (const stroke of strokes) {
+				const {enterAt, enterDuration} = stroke;
+				if (stroke.type !== 'path' || stroke.enter !== 'draw' || (stroke.rough ?? tl.rough) ||
+					stroke.dashed || stroke.arrow || stroke.fill || stroke.exitAt != null) {
+					errs.push(`${where}: penTravel stroke "${stroke.id}" must be a plain drawn path`);
+					continue;
+				}
+				if (enterAt == null || enterDuration == null || !Number.isFinite(enterAt) ||
+					!Number.isFinite(enterDuration) || enterDuration <= 0 ||
+					enterAt <= previousEnd || enterAt + enterDuration >= travel.end) {
+					errs.push(`${where}: penTravel stroke "${stroke.id}" needs time for pen repositioning`);
+					continue;
+				}
+				previousEnd = enterAt + enterDuration;
+			}
+		}
 		const carries: {start: number; end: number; id: string}[] = [];
 		(s.elements ?? []).forEach((e: TimelineElement, ei) => {
 			const w = `${where}.elements[${ei}](${e.id})`;
@@ -83,6 +108,8 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				errs.push(`${w}: mark phải là "khoanh" hoặc "gach_chan" (${String(ex.mark)})`);
 			if (e.carry) {
 				const c = e.carry;
+				if (c.mode !== undefined && c.mode !== 'carry' && c.mode !== 'drag')
+					errs.push(`${w}: carry.mode must be "carry" or "drag"`);
 				const times = [c.start, c.contact, c.pickup, c.land, c.release, c.end];
 				if (!tl.carryHand) errs.push(`${w}: carry requires timeline.carryHand`);
 				if (![c.grip, c.target, c.from, c.to].every(validPoint))

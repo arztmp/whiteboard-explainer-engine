@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {Img} from 'remotion';
-import {animateCarry, handPose, selectSceneHand, type ElementState, type HandPose} from '../lib/anim';
+import {sampleSceneAnimation, type ElementState} from '../lib/anim';
 import {resolveAsset} from '../lib/assets';
 import {resolveElement, type Ctx, type Resolved} from '../lib/resolve';
 import type {HandConfig, Scene, Timeline} from '../types';
@@ -58,16 +58,12 @@ export const SceneContent: React.FC<{
 	t: number;
 	layer: 'elements' | 'hands';
 	hand?: HandConfig | null;
+	penTravel?: Scene['penTravel'];
 	carryHand?: Timeline['carryHand'];
-}> = ({resolved, ctx, t, layer, hand, carryHand}) => {
-	const items = resolved
-		.map((r, i) => ({r, i, ...animateCarry(r, t, ctx.fps)}))
-		.sort((a, b) => (a.r.el.z ?? 0) - (b.r.el.z ?? 0) || a.i - b.i);
+}> = ({resolved, ctx, t, layer, hand, carryHand, penTravel}) => {
+	const {items, hand: selected} = sampleSceneAnimation(resolved, t, ctx.fps, penTravel);
 
 	if (layer === 'hands') {
-		const carrying = items.find((item) => item.hand)?.hand ?? null;
-		const poses = items.map(({r, state}) => handPose(r, state, t)).filter((p): p is HandPose => p !== null);
-		const selected = selectSceneHand(carrying, poses);
 		if (selected.kind === 'carry' && carryHand) {
 			const pose = selected.pose;
 			const src = resolveAsset(ctx.videoId, carryHand.src);
@@ -99,7 +95,7 @@ export const SceneContent: React.FC<{
 		if (!pose || pose.opacity <= 0.001) return null;
 		return (
 			<Img
-				data-draw-hand
+				data-draw-hand={pose.active ? 'stroke' : 'travel'}
 				src={url}
 				style={{
 					position: 'absolute',
