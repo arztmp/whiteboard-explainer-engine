@@ -23,14 +23,23 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - name: Install tools and build input fixtures
+      - name: Install Python test and fixture dependencies
+        timeout-minutes: 4
+        run: python -m pip install --timeout 15 --retries 2 -r requirements.txt
+      - name: Install FFmpeg and select runner Chrome
+        timeout-minutes: 4
         run: |
-          python -m pip install -r requirements.txt
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ffmpeg time
+          if ! command -v ffmpeg || ! command -v ffprobe || [ ! -x /usr/bin/time ]; then
+            apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+            if ! sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time; then
+              sudo apt-get "${apt_options[@]}" update
+              sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time
+            fi
+          fi
           browser=$(command -v google-chrome || command -v chromium)
           printf 'CHROME_PATH=%s\nARTIFACT_DIR=%s\n' "$browser" "$RUNNER_TEMP/full-animation" >> "$GITHUB_ENV"
-          python scripts/build-animation-demo.py --endurance
+      - name: Build demo and durability fixtures
+        run: python scripts/build-animation-demo.py --endurance
       - name: Run existing Python tests
         run: python -m pytest -q
       - name: Check TypeScript and replay previous hand-motion regression
@@ -59,6 +68,7 @@ jobs:
         run: |
           python scripts/verify-animation-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/endurance.mp4" "$RUNNER_TEMP/endurance-metrics.txt"
           cp docs/animation-test-status.md "$ARTIFACT_DIR/feature-status.md"
+          cat "$ARTIFACT_DIR/timing-report.json" "$ARTIFACT_DIR/endurance-report.json"
       - name: Upload video, sample frames, and reports
         uses: actions/upload-artifact@v4
         with:
