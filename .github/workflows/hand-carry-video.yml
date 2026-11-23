@@ -33,10 +33,11 @@ jobs:
         env:
           ARTIFACT_DIR: ${{ runner.temp }}/hand-carry
         run: |
+          browser=$(command -v google-chrome || command -v chromium)
           mkdir -p "$ARTIFACT_DIR"
           npm run render -- C "$ARTIFACT_DIR/hand-carry.mp4" \
             --props='{"videoId":"carry-demo","timelineFile":"timeline.json"}' \
-            --concurrency=2 --timeout=120000
+            --browser-executable="$browser" --concurrency=2 --timeout=120000
       - name: Verify video and extract sample frames
         env:
           ARTIFACT_DIR: ${{ runner.temp }}/hand-carry
