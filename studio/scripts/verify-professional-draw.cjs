@@ -154,7 +154,8 @@ async function main() {
 				return [box.left,box.top,box.right,box.bottom].map(Math.floor);
 			}),
 		])));
-		const png = (await page._client().send('Page.captureScreenshot',{format:'png'})).data;
+		const {value: {data: png}} = await page._client().send('Page.captureScreenshot',{format:'png'});
+		assert(typeof png === 'string' && png.length > 100, 'missing comparison screenshot');
 		await writeFile(join(out,'original-comparison.png'),Buffer.from(png,'base64'));
 		await writeFile(join(out,'coordinates.csv'),csv.join('\n')+'\n');
 		await writeFile(join(out,'browser-verification.json'),JSON.stringify({

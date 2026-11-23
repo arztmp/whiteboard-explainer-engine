@@ -216,7 +216,9 @@ async function main() {
 		assert(scatter[2][0] > scatter[1][0] && scatter[2][0] > scatter[3][0]);
 		const screenshot = async (frame) => {
 			await seek(frame);
-			return (await page._client().send('Page.captureScreenshot', {format: 'png'})).data;
+			const {value: {data}} = await page._client().send('Page.captureScreenshot', {format: 'png'});
+			assert(typeof data === 'string' && data.length > 100, 'missing scatter comparison screenshot');
+			return data;
 		};
 		assert.equal(await screenshot(100.5 * 30), await screenshot(108 * 30), 'scatter did not restore original pixels');
 		const movement = [120.5, 124, 127, 129].map((t) => samples.get(t * 30).elements);
