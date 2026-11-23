@@ -59,7 +59,7 @@ legacy = []
 for el in old["scenes"][0]["elements"]:
     if el["type"] != "path":
         continue
-    legacy.append(dict(el, id=f"legacy-{el['id']}", enter="none", enterAt=0, hand=False, stroke=palette["gray"],
+    legacy.append(dict(el, id=f"legacy-{el['id']}", enter="none", enterAt=0, hand=False, stroke=palette["navy"],
                        d=re.sub(r"(\d+) (\d+)", lambda m: f"{320+int(m[1])*.66:.2f} {-6+int(m[2])*.66:.2f}", el["d"])))
 add("comparison", "Aynı metin, iki yazım biçimi", 9, [
     typography("legacy-label", "ÖNCEKİ ÇİZGİ HARFLER", 970, 248, 22),
@@ -97,7 +97,7 @@ for name, figure, width in [("robot", "Robot", 676), ("rover", "Rover", 1045)]:
         add(name+"-"+mode, figure+" · "+("Dış ve iç çizgiler" if mode=="trace" else "Çizgiler ve bölgesel renk"),
             duration, el, pen=True, scale=.68, white=mode=="full")
 
-detail, stats = compile_illustration(svg, "geometry.svg", "ink-detail", (950, 557), 1470, clock+.58, clock+5.72, mode="full")
+detail, stats = compile_illustration(svg, "geometry.svg", "ink-detail", (950, 557), 1470, clock+.88, clock+5.72, mode="full")
 coverage.append(stats)
 reproduce["svg"] = copy.deepcopy(detail[0])
 add("close-up", "Yakın plan · Kalemin temas ve kalkış anları", 7, detail, pen=True, scale=.97)

@@ -156,15 +156,25 @@ def compile_illustration(analysis, src, prefix, center, width, start, end, *, mo
     if analysis["isSvg"]:
         keep = regions_
     else:
-        for region, group in regions_.items():
-            keep[region] = sorted(group, key=lambda e: e[1] * (1.28 if e[0] else 1), reverse=True)[:1]
-        remaining = sorted(((item[1] * (1.18 if item[0] else 1), region, i, item)
-                            for region, group in regions_.items()
-                            for i, item in enumerate(sorted(group, key=lambda e: e[1] * (1.28 if e[0] else 1), reverse=True))
-                            if i),
-                           key=lambda entry: entry[0], reverse=True)
-        for _, region, _, item in remaining[:max(0, limit - len(keep))]:
-            keep[region].append(item)
+        def importance(item):
+            exterior, length, _ = item
+            return length * (.78 if exterior else 1.3)
+
+        regional = {n: sorted(group, key=importance, reverse=True) for n, group in regions_.items()}
+        keep = {label: group[:1] for label, group in regional.items()}
+        exterior_count = sum(group[0][0] for group in keep.values())
+        exterior_limit = max(exterior_count, round(limit * .38))
+        remaining = sorted(((label, item) for label, group in regional.items() for item in group[1:]),
+                           key=lambda choice: importance(choice[1]), reverse=True)
+        selected = len(keep)
+        for label, item in remaining:
+            if selected >= limit:
+                break
+            if item[0] and exterior_count >= exterior_limit:
+                continue
+            keep[label].append(item)
+            exterior_count += item[0]
+            selected += 1
     ordered = []
     previous = np.array([0., 0.])
     for region in ranked:
