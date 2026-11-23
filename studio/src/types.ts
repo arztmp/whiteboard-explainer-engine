@@ -60,6 +60,22 @@ export interface TransitionIn {
 	dip?: number;
 }
 
+export interface Carry {
+	/** Scene-local positions. The target is the element anchor, grip is relative to that anchor. */
+	grip: Vec;
+	from: Vec;
+	to: Vec;
+	target: Vec;
+	lift?: number;
+	/** Absolute timeline seconds. */
+	start: number;
+	contact: number;
+	pickup: number;
+	land: number;
+	release: number;
+	end: number;
+}
+
 interface BaseElement {
 	id: string;
 	x?: number;
@@ -72,6 +88,7 @@ interface BaseElement {
 	exit?: ExitType;
 	exitDuration?: number;
 	moves?: Move[];
+	carry?: Carry;
 	/** mở rộng: opacity/scale/rotate gốc, z-index */
 	opacity?: number;
 	scale?: number;
@@ -321,6 +338,8 @@ export interface Timeline {
 	hud?: Hud | null;
 	background?: string;
 	hand?: HandConfig | null;
+	/** Optional sprite grid ordered left-to-right from open fingers to a closed grip. */
+	carryHand?: (HandConfig & {grid?: {columns: number; rows: number}}) | null;
 	board?: {width: number; height: number} | null;
 	/** mở rộng: chữ mặc định 'sans' (A/B) hoặc 'hand' (C) */
 	font?: FontKind;

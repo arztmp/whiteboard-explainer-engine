@@ -1,4 +1,4 @@
-import type {Timeline, TimelineElement} from '../types';
+import type {Timeline, TimelineElement, Vec} from '../types';
 
 const ELEMENT_TYPES = ['image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
 const ENTERS = ['pop', 'slide-up', 'slide-left', 'slide-right', 'fade', 'draw', 'grow', 'none'];
@@ -18,6 +18,8 @@ const REQUIRED: Record<string, string[]> = {
 	caption: ['words', 'x', 'y'],
 };
 
+const validPoint = (point: Vec | undefined) => point && Number.isFinite(point.x) && Number.isFinite(point.y);
+
 /** Kiểm tra nhẹ timeline, trả về danh sách lỗi (rỗng = hợp lệ) */
 export const validateTimeline = (tl: Timeline): string[] => {
 	const errs: string[] = [];
@@ -33,6 +35,15 @@ export const validateTimeline = (tl: Timeline): string[] => {
 		errs.push(`roughness phải là số ≥ 0 (${String(tl.roughness)})`);
 	if (tl.bowing !== undefined && !(typeof tl.bowing === 'number' && Number.isFinite(tl.bowing)))
 		errs.push(`bowing phải là số (${String(tl.bowing)})`);
+	const carryHand = tl.carryHand;
+	if (carryHand) {
+		const {src, tip, scale, grid} = carryHand;
+		if (typeof src !== 'string' || !src || !validPoint(tip) ||
+			(scale !== undefined && (!Number.isFinite(scale) || scale <= 0)))
+			errs.push('carryHand requires src, a finite tip and a positive scale');
+		if (grid && ![grid.columns, grid.rows].every((n) => Number.isInteger(n) && n > 0))
+			errs.push('carryHand.grid requires positive integer columns and rows');
+	}
 	const ids = new Set<string>();
 	(tl.scenes ?? []).forEach((s, si) => {
 		const where = `scenes[${si}](${s.id})`;
@@ -45,6 +56,7 @@ export const validateTimeline = (tl: Timeline): string[] => {
 			if (s.transitionIn.fromElement && !prev.elements.some((e) => e.id === s.transitionIn!.fromElement))
 				errs.push(`${where}: fromElement "${s.transitionIn.fromElement}" không có ở scene trước`);
 		}
+		const carries: {start: number; end: number; id: string}[] = [];
 		(s.elements ?? []).forEach((e: TimelineElement, ei) => {
 			const w = `${where}.elements[${ei}](${e.id})`;
 			if (!e.id) errs.push(`${w}: thiếu id`);
@@ -69,7 +81,27 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				errs.push(`${w}: maxLines phải là số nguyên ≥ 1 (${String(ex.maxLines)})`);
 			if (e.type === 'text' && ex.mark !== undefined && !['khoanh', 'gach_chan'].includes(ex.mark as string))
 				errs.push(`${w}: mark phải là "khoanh" hoặc "gach_chan" (${String(ex.mark)})`);
+			if (e.carry) {
+				const c = e.carry;
+				const times = [c.start, c.contact, c.pickup, c.land, c.release, c.end];
+				if (!tl.carryHand) errs.push(`${w}: carry requires timeline.carryHand`);
+				if (![c.grip, c.target, c.from, c.to].every(validPoint))
+					errs.push(`${w}: carry requires finite grip, target, from and to points`);
+				if (!times.every((at, i) => Number.isFinite(at) && (i === 0 || at > times[i - 1])) ||
+					c.start < s.start || c.end > Math.min(s.end, tl.duration))
+					errs.push(`${w}: carry timestamps must increase and fit within the scene`);
+				if (c.lift !== undefined && (!Number.isFinite(c.lift) || c.lift < 0))
+					errs.push(`${w}: carry.lift must be finite and nonnegative`);
+				if (c.contact < (e.enterAt ?? s.start) || (e.exitAt != null && c.release > e.exitAt))
+					errs.push(`${w}: the element must be on screen from contact to release`);
+				carries.push({start: c.start, end: c.end, id: e.id});
+			}
 		});
+		carries.sort((a, b) => a.start - b.start);
+		for (let i = 1; i < carries.length; i++) {
+			if (carries[i].start < carries[i - 1].end)
+				errs.push(`${where}: overlapping carries for ${carries[i - 1].id} and ${carries[i].id}`);
+		}
 	});
 	return errs;
 };

@@ -1,0 +1,66 @@
+name: Hand carry video
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/hand-carry-artifacts]
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg
+      - name: Install renderer and check TypeScript
+        working-directory: studio
+        run: |
+          npm ci
+          npm run typecheck
+      - name: Render demo
+        working-directory: studio
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/hand-carry
+        run: |
+          mkdir -p "$ARTIFACT_DIR"
+          npm run render -- C "$ARTIFACT_DIR/hand-carry.mp4" \
+            --props='{"videoId":"carry-demo","timelineFile":"timeline.json"}' \
+            --concurrency=2 --timeout=120000
+      - name: Verify video and extract sample frames
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/hand-carry
+        run: |
+          video="$ARTIFACT_DIR/hand-carry.mp4"
+          properties=$(ffprobe -v error -select_streams v:0 -show_entries \
+            stream=codec_name,width,height,avg_frame_rate,duration,nb_frames -of json "$video")
+          jq -e '.streams | length == 1 and (.[0] |
+            .codec_name == "h264" and .width == 1920 and .height == 1080 and
+            .avg_frame_rate == "30/1" and .nb_frames == "450" and
+            (.duration | tonumber) == 15)' <<< "$properties"
+
+          ffmpeg -v error -xerror -i "$video" -f null -
+          ffmpeg -v error -i "$video" \
+            -vf "select='eq(n,0)+eq(n,126)+eq(n,153)+eq(n,230)+eq(n,301)+eq(n,335)+eq(n,420)',scale=480:270,tile=2x4" \
+            -frames:v 1 -threads 1 -update 1 "$ARTIFACT_DIR/sample-frames.png"
+          test -s "$ARTIFACT_DIR/sample-frames.png"
+      - name: Upload video and sample frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: hand-carry
+          path: |
+            ${{ runner.temp }}/hand-carry/hand-carry.mp4
+            ${{ runner.temp }}/hand-carry/sample-frames.png
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

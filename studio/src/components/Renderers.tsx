@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Img} from 'remotion';
-import {computeState, toScene} from '../lib/anim';
+import {animateCarry, toScene} from '../lib/anim';
 import {camTransform, cameraAt, DEFAULT_CAM, lerpCam, type Cam} from '../lib/camera';
 import {clamp, easeInOut, easeOut, progress, seededRandom} from '../lib/math';
 import {resolveElement, type Ctx} from '../lib/resolve';
@@ -52,7 +52,7 @@ const SceneLayer: React.FC<{
 				}}
 			>
 				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="elements" />
-				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" hand={tl.hand} />
+				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" hand={tl.hand} carryHand={tl.carryHand} />
 			</div>
 		</AbsoluteFill>
 	);
@@ -63,7 +63,7 @@ const elementBounds = (scene: Scene, id: string | undefined, ctx: Ctx, t: number
 	const el = scene.elements.find((e) => e.id === id);
 	if (!el) return null;
 	const r = resolveElement(el, scene, ctx);
-	const s = computeState(r, t, ctx.fps);
+	const {state: s} = animateCarry(r, t, ctx.fps);
 	const b = r.geom.box;
 	const c = toScene(s, {x: b.ox + b.w / 2, y: b.oy + b.h / 2});
 	return {x: c.x, y: c.y, w: b.w * s.scale, h: b.h * s.scale};
@@ -163,7 +163,7 @@ const BoardScene: React.FC<{
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
 	return (
 		<div style={{position: 'absolute', left: origin.x, top: origin.y, width: tl.width, height: tl.height}}>
-			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} hand={tl.hand} />
+			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} hand={tl.hand} carryHand={tl.carryHand} />
 		</div>
 	);
 };

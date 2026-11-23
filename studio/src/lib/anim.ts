@@ -208,3 +208,67 @@ export const pickHand = (poses: HandPose[]): HandPose | null => {
 	const pool = active.length ? active : poses;
 	return pool.reduce((a, b) => (b.startedAt > a.startedAt ? b : a));
 };
+
+const carryGrip = (state: ElementState, local: Vec): Vec => {
+	// Match the precision and order of the element's CSS transform, including a card flip.
+	const a = Number(state.rotateY.toFixed(2)) * Math.PI / 180;
+	const perspective = 1400 / (1400 + local.x * Math.sin(a));
+	return toScene({
+		...state,
+		dx: Number(state.dx.toFixed(2)),
+		dy: Number(state.dy.toFixed(2)),
+		scale: Number(state.scale.toFixed(4)),
+	}, {x: local.x * Math.cos(a) * perspective, y: local.y * perspective});
+};
+
+export interface CarryHandPose extends Vec {
+	closed: number;
+	rotate: number;
+	phase: 'approach' | 'grip' | 'carry' | 'release' | 'exit';
+}
+
+/** The element and its bearing hand are sampled together, with no state from previous frames. */
+export const animateCarry = (r: Resolved, t: number, fps: number, base = computeState(r, t, fps)):
+	{state: ElementState; hand: CarryHandPose | null} => {
+	const c = r.el.carry;
+	if (!c || t < c.start) return {state: base, hand: null};
+	const between = (a: number, b: number) => easeInOut(progress(t, a, b - a));
+	const state = {...base};
+	if (t >= c.pickup) {
+		const start = computeState(r, c.pickup, fps);
+		const p = between(c.pickup, c.land);
+		state.x = lerp(start.x + Number(start.dx.toFixed(2)), c.target.x, p);
+		state.y = lerp(start.y + Number(start.dy.toFixed(2)), c.target.y, p) - (c.lift ?? 95) * 4 * p * (1 - p);
+		state.dx = 0;
+		state.dy = 0;
+	}
+	if (t >= c.end || (t < c.release && !state.visible)) return {state, hand: null};
+
+	const grip = carryGrip(state, c.grip);
+	const pose = (phase: CarryHandPose['phase'], closed: number, rotate: number, point = grip) =>
+		({state, hand: {...point, phase, closed, rotate}});
+	const mix = (from: Vec, to: Vec, p: number): Vec =>
+		({x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p)});
+	if (t < c.contact) {
+		const p = between(c.start, c.contact);
+		return pose('approach', 0, lerp(-12, -3, p), mix(c.from, grip, p));
+	}
+	if (t < c.pickup) {
+		const p = between(c.contact, c.pickup);
+		return pose('grip', p, lerp(-3, 0, p));
+	}
+	if (t < c.land) {
+		const p = between(c.pickup, c.land);
+		return pose('carry', 1, -8 * Math.sin(Math.PI * p));
+	}
+	if (t < c.release) {
+		const p = between(c.land, c.release);
+		return pose('release', 1 - p, 4 * p);
+	}
+	const p = between(c.release, c.end);
+	const atRelease = {...computeState(r, c.release, fps), ...c.target, dx: 0, dy: 0};
+	return pose('exit', 0, lerp(4, 18, p), mix(carryGrip(atRelease, c.grip), c.to, p));
+};
+
+export const selectSceneHand = (carry: CarryHandPose | null, drawing: HandPose[]) =>
+	carry ? {kind: 'carry' as const, pose: carry} : {kind: 'draw' as const, pose: pickHand(drawing)};

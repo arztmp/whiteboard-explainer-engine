@@ -16,7 +16,9 @@ const loadSize = (url: string) =>
 /** Đọc kích thước thật của mọi ảnh (để tính h theo tỉ lệ và vẽ mask) */
 const collectImageSizes = async (tl: Timeline, videoId: string) => {
 	const urls = new Set<string>();
-	if (tl.hand?.src) urls.add(resolveAsset(videoId, tl.hand.src));
+	for (const hand of [tl.hand, tl.carryHand]) {
+		if (hand?.src) urls.add(resolveAsset(videoId, hand.src));
+	}
 	for (const s of tl.scenes) {
 		for (const e of s.elements) {
 			if (e.type === 'image') urls.add(resolveAsset(videoId, e.src));

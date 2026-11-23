@@ -1,9 +1,9 @@
 import React, {useMemo} from 'react';
 import {Img} from 'remotion';
-import {computeState, handPose, pickHand, type ElementState, type HandPose} from '../lib/anim';
+import {animateCarry, handPose, selectSceneHand, type ElementState, type HandPose} from '../lib/anim';
 import {resolveAsset} from '../lib/assets';
 import {resolveElement, type Ctx, type Resolved} from '../lib/resolve';
-import type {HandConfig, Scene} from '../types';
+import type {HandConfig, Scene, Timeline} from '../types';
 import {
 	BarView,
 	CaptionView,
@@ -58,22 +58,48 @@ export const SceneContent: React.FC<{
 	t: number;
 	layer: 'elements' | 'hands';
 	hand?: HandConfig | null;
-	handUrl?: string;
-}> = ({resolved, ctx, t, layer, hand}) => {
+	carryHand?: Timeline['carryHand'];
+}> = ({resolved, ctx, t, layer, hand, carryHand}) => {
 	const items = resolved
-		.map((r, i) => ({r, i, s: computeState(r, t, ctx.fps)}))
+		.map((r, i) => ({r, i, ...animateCarry(r, t, ctx.fps)}))
 		.sort((a, b) => (a.r.el.z ?? 0) - (b.r.el.z ?? 0) || a.i - b.i);
 
 	if (layer === 'hands') {
-		if (!hand) return null;
+		const carrying = items.find((item) => item.hand)?.hand ?? null;
+		const poses = items.map(({r, state}) => handPose(r, state, t)).filter((p): p is HandPose => p !== null);
+		const selected = selectSceneHand(carrying, poses);
+		if (selected.kind === 'carry' && carryHand) {
+			const pose = selected.pose;
+			const src = resolveAsset(ctx.videoId, carryHand.src);
+			const nat = ctx.imageSizes[src] ?? {w: 400, h: 400};
+			const scale = carryHand.scale ?? 1;
+			const {columns, rows} = carryHand.grid ?? {columns: 1, rows: 1};
+			const index = Math.round(pose.closed * (columns * rows - 1));
+			const width = nat.w * scale / columns;
+			const height = nat.h * scale / rows;
+			return (
+				<div
+					data-carry-hand={pose.phase}
+					style={{position: 'absolute', left: pose.x, top: pose.y, transform: `rotate(${pose.rotate}deg)`,
+						transformOrigin: '0 0', pointerEvents: 'none'}}
+				>
+					<div data-carry-cell={index} style={{position: 'absolute', overflow: 'hidden', width, height,
+						left: -carryHand.tip.x * scale, top: -carryHand.tip.y * scale}}>
+						<Img src={src} style={{position: 'absolute', width: nat.w * scale, height: nat.h * scale,
+							left: -(index % columns) * width, top: -Math.floor(index / columns) * height}} />
+					</div>
+				</div>
+			);
+		}
+		if (!hand || selected.kind !== 'draw') return null;
 		const url = resolveAsset(ctx.videoId, hand.src);
 		const nat = ctx.imageSizes[url] ?? {w: 400, h: 400};
 		const scale = hand.scale ?? 1;
-		const poses = items.map(({r, s}) => handPose(r, s, t)).filter((p): p is HandPose => p !== null);
-		const pose = pickHand(poses);
+		const pose = selected.pose;
 		if (!pose || pose.opacity <= 0.001) return null;
 		return (
 			<Img
+				data-draw-hand
 				src={url}
 				style={{
 					position: 'absolute',
@@ -90,7 +116,7 @@ export const SceneContent: React.FC<{
 
 	return (
 		<>
-			{items.map(({r, s}) => {
+			{items.map(({r, state: s}) => {
 				if (!s.visible) return null;
 				const tf = [
 					`translate(${s.dx.toFixed(2)}px, ${s.dy.toFixed(2)}px)`,
