@@ -5,6 +5,8 @@ export type Style = 'A' | 'B' | 'C';
 
 export type EnterType =
 	| 'pop'
+	| 'slide'
+	| 'rotate'
 	| 'slide-up'
 	| 'slide-left'
 	| 'slide-right'
@@ -77,6 +79,8 @@ export interface Carry {
 	end: number;
 }
 
+export type FadeCurve = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
 interface BaseElement {
 	id: string;
 	x?: number;
@@ -84,6 +88,12 @@ interface BaseElement {
 	enterAt?: number;
 	enter?: EnterType;
 	enterDuration?: number;
+	enterOffset?: Vec;
+	enterAngle?: number;
+	enterScale?: number;
+	enterCurve?: FadeCurve;
+	exitCurve?: FadeCurve;
+	zoom?: {at: number; in: number; hold?: number; out: number; scale: number; origin?: Vec};
 	hand?: boolean;
 	exitAt?: number;
 	exit?: ExitType;
@@ -110,6 +120,9 @@ export interface ImageElement extends BaseElement {
 	flipX?: boolean;
 	/** khi enter = draw: vẽ theo trace map <src>.trace.png/.trace.json (tạo offline) */
 	trace?: boolean;
+	reveal?: {rows?: number};
+	scatter?: {at: number; out: number; hold?: number; back: number; columns?: number; rows?: number;
+		direction?: Vec; returnDirection?: Vec};
 	/** đoạn video thật (ghi màn hình…) phát trong khung ảnh, bắt đầu lúc enterAt; `src` là khung đại diện để lấy kích thước */
 	video?: string;
 	videoRate?: number;
@@ -273,7 +286,20 @@ export interface ClockElement extends BaseElement {
 	accent?: string;
 }
 
+/** Matched closed contour vertices in local pixels, ordered in the same winding direction. */
+export interface MorphElement extends BaseElement {
+	type: 'morph';
+	x: number;
+	y: number;
+	from: Vec[];
+	to: Vec[];
+	at: number;
+	duration: number;
+	fill?: string;
+}
+
 export type TimelineElement =
+	| MorphElement
 	| ImageElement
 	| TextElement
 	| CounterElement
@@ -285,6 +311,7 @@ export type TimelineElement =
 	| CaptionElement;
 
 export interface PenTravel {
+	scale?: number;
 	/** Absolute timeline seconds and scene coordinates at the offscreen endpoints. */
 	start: number;
 	end: number;
@@ -366,6 +393,7 @@ export interface Timeline {
 	bowing?: number;
 	/** mở rộng: tự co chữ vừa khung cho label rect/circle, title/body card, text có maxWidth (mặc định false) */
 	fitText?: boolean;
+	sceneSlideLeft?: boolean;
 	scenes: Scene[];
 }
 

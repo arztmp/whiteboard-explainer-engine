@@ -1,12 +1,13 @@
 import type {Timeline, TimelineElement, Vec} from '../types';
 
-const ELEMENT_TYPES = ['image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
-const ENTERS = ['pop', 'slide-up', 'slide-left', 'slide-right', 'fade', 'draw', 'grow', 'none'];
+const ELEMENT_TYPES = ['morph', 'image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
+const ENTERS = ['slide', 'rotate', 'pop', 'slide-up', 'slide-left', 'slide-right', 'fade', 'draw', 'grow', 'none'];
 const EXITS = ['fade', 'slide-down', 'shrink', 'none'];
 const TRANSITIONS = ['none', 'fade', 'push-left', 'push-up', 'zoom-from', 'pan'];
 
 const REQUIRED: Record<string, string[]> = {
 	image: ['src', 'w', 'x', 'y'],
+	morph: ['x', 'y', 'from', 'to', 'at', 'duration'],
 	text: ['text', 'x', 'y'],
 	counter: ['from', 'to', 'x', 'y'],
 	card: ['w', 'h', 'x', 'y'],
@@ -60,6 +61,7 @@ export const validateTimeline = (tl: Timeline): string[] => {
 		if (travel) {
 			if (!tl.hand || !validPoint(travel.from) || !validPoint(travel.to) ||
 				!Number.isFinite(travel.start) || !Number.isFinite(travel.end) ||
+				(travel.scale !== undefined && (!Number.isFinite(travel.scale) || travel.scale <= 0)) ||
 				travel.start < s.start || travel.end > s.end || travel.end > tl.duration || travel.start >= travel.end)
 				errs.push(`${where}: penTravel requires a hand, finite endpoints and a time range inside the scene`);
 			const strokes = (s.elements ?? []).filter((e) => e.hand).sort((a, b) => (a.enterAt ?? 0) - (b.enterAt ?? 0));
@@ -67,9 +69,11 @@ export const validateTimeline = (tl: Timeline): string[] => {
 			let previousEnd = travel.start;
 			for (const stroke of strokes) {
 				const {enterAt, enterDuration} = stroke;
-				if (stroke.type !== 'path' || stroke.enter !== 'draw' || (stroke.rough ?? tl.rough) ||
-					stroke.dashed || stroke.arrow || stroke.fill || stroke.exitAt != null) {
-					errs.push(`${where}: penTravel stroke "${stroke.id}" must be a plain drawn path`);
+				const validPath = stroke.type === 'path' && !(stroke.rough ?? tl.rough) &&
+					!stroke.dashed && !stroke.arrow && !stroke.fill;
+				const validReveal = stroke.type === 'image' && !!stroke.reveal;
+				if ((!validPath && !validReveal) || stroke.enter !== 'draw' || stroke.exitAt != null) {
+					errs.push(`${where}: penTravel stroke "${stroke.id}" must be a plain drawn path or image reveal`);
 					continue;
 				}
 				if (enterAt == null || enterDuration == null || !Number.isFinite(enterAt) ||
@@ -106,6 +110,28 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				errs.push(`${w}: maxLines phải là số nguyên ≥ 1 (${String(ex.maxLines)})`);
 			if (e.type === 'text' && ex.mark !== undefined && !['khoanh', 'gach_chan'].includes(ex.mark as string))
 				errs.push(`${w}: mark phải là "khoanh" hoặc "gach_chan" (${String(ex.mark)})`);
+			const positive = (n: number) => Number.isFinite(n) && n > 0;
+			if (e.type === 'morph' && (!Array.isArray(e.from) || !Array.isArray(e.to) ||
+				e.from.length < 3 || e.from.length !== e.to.length ||
+				![...e.from, ...e.to].every(validPoint) || !positive(e.duration) || !Number.isFinite(e.at)))
+				errs.push(`${w}: morph needs equally sized finite contours and a positive duration`);
+			if (e.type === 'image') {
+				const {reveal, scatter} = e;
+				if (reveal && (scatter || e.trace || e.video || e.enter !== 'draw' ||
+					(reveal.rows !== undefined && (!Number.isInteger(reveal.rows) || !positive(reveal.rows)))))
+					errs.push(`${w}: reveal requires draw and a positive row count`);
+				if (scatter && (e.video || e.trace || e.flipX || !Number.isFinite(scatter.at) ||
+					!positive(scatter.out) || !positive(scatter.back) || !Number.isFinite(scatter.hold ?? 0) ||
+					(scatter.hold ?? 0) < 0 || (scatter.returnDirection && !(scatter.hold && scatter.hold > 0)) ||
+					![scatter.columns ?? 12, scatter.rows ?? 8].every((n) => Number.isInteger(n) && n >= 1 && n <= 30) ||
+					[scatter.direction, scatter.returnDirection].some((v) => v !== undefined && !validPoint(v))))
+					errs.push(`${w}: invalid scatter timing, grid or directions`);
+			}
+			if (e.zoom && (!Number.isFinite(e.zoom.at) || !positive(e.zoom.in) || !positive(e.zoom.out) ||
+				!positive(e.zoom.scale) || !Number.isFinite(e.zoom.hold ?? 0) || (e.zoom.hold ?? 0) < 0 ||
+				(e.zoom.origin && !validPoint(e.zoom.origin))))
+				errs.push(`${w}: invalid zoom timing, scale or origin`);
+
 			if (e.carry) {
 				const c = e.carry;
 				if (c.mode !== undefined && c.mode !== 'carry' && c.mode !== 'drag')

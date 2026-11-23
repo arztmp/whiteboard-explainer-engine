@@ -1,6 +1,6 @@
 // Trạng thái animation của 1 element tại thời điểm t (giây tuyệt đối). Hàm thuần.
 import {spring} from 'remotion';
-import type {PenTravel, Vec} from '../types';
+import type {FadeCurve, PenTravel, Vec} from '../types';
 import {clamp, easeDraw, easeIn, easeInOut, easeOut, lerp, progress} from './math';
 import type {Resolved} from './resolve';
 
@@ -24,6 +24,15 @@ const SLIDE = 60;
 
 // Spring êm: overshoot rất nhỏ (<4% trên khoảng 0.85→1)
 const POP_SPRING = {damping: 18, stiffness: 180, mass: 1};
+
+const fadeAt = (p: number, curve?: FadeCurve) => {
+	switch (curve) {
+		case 'linear': return p;
+		case 'ease-in': return easeIn(p);
+		case 'ease-out': return easeOut(p);
+		default: return easeInOut(p);
+	}
+};
 
 export const computeState = (r: Resolved, t: number, fps: number): ElementState => {
 	const {el, geom} = r;
@@ -82,6 +91,15 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 				s.opacity *= easeOut(clamp(p / 0.6, 0, 1));
 				break;
 			}
+			case 'slide': {
+				const offset = el.enterOffset ?? {x: -SLIDE, y: 0};
+				s.dx += offset.x * (1 - easeOut(p));
+				s.dy += offset.y * (1 - easeOut(p));
+				break;
+			}
+			case 'rotate':
+				s.rotate += (el.enterAngle ?? -180) * (1 - easeInOut(p));
+				break;
 			case 'slide-up':
 				s.dy += SLIDE * (1 - easeOut(p));
 				s.opacity *= easeOut(clamp(p / 0.7, 0, 1));
@@ -95,11 +113,11 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 				s.opacity *= easeOut(clamp(p / 0.7, 0, 1));
 				break;
 			case 'fade':
-				s.opacity *= easeInOut(p);
+				s.opacity *= fadeAt(p, el.enterCurve);
 				break;
 			case 'grow':
 				// bar tự mọc chiều cao; các loại khác phóng to từ 0
-				if (el.type !== 'bar') s.scale *= easeOut(p);
+				if (el.type !== 'bar') s.scale *= lerp(el.enterScale ?? 0, 1, easeOut(p));
 				s.opacity *= clamp(p * 3, 0, 1);
 				break;
 			case 'draw':
@@ -126,7 +144,7 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		}
 		switch (r.exit) {
 			case 'fade':
-				s.opacity *= 1 - easeInOut(q);
+				s.opacity *= 1 - fadeAt(q, el.exitCurve);
 				break;
 			case 'slide-down':
 				s.dy += SLIDE * easeIn(q);
@@ -145,6 +163,16 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		const w = t * hz * Math.PI * 2;
 		s.rotate += Math.sin(w) * amp;
 		if (el.idle.scaleAmp) s.scale *= 1 + Math.sin(w + Math.PI / 2) * el.idle.scaleAmp;
+	}
+
+	if (el.zoom) {
+		const {at, in: zoomIn, hold = 0, out, scale, origin = {x: 0, y: 0}} = el.zoom;
+		const amount = easeInOut(progress(t, at, zoomIn)) * (1 - easeInOut(progress(t, at + zoomIn + hold, out)));
+		const factor = lerp(1, scale, amount);
+		const pivot = toScene(s, origin);
+		s.dx += (pivot.x - s.x - s.dx) * (1 - factor);
+		s.dy += (pivot.y - s.y - s.dy) * (1 - factor);
+		s.scale *= factor;
 	}
 
 	if (s.opacity <= 0.001) s.visible = false;
@@ -275,14 +303,16 @@ type AnimatedItem = {r: Resolved; state: ElementState; hand: CarryHandPose | nul
 
 const travelPen = (items: AnimatedItem[], travel: PenTravel, t: number, fps: number): HandPose | null => {
 	if (t < travel.start || t >= travel.end) return null;
-	const strokes = items.filter(({r}) => r.el.hand === true && r.enter === 'draw' && r.el.type === 'path')
+	const strokes = items.filter(({r}) => r.el.hand === true && r.enter === 'draw' && (r.el.type === 'path' || (r.el.type === 'image' && r.el.reveal)))
 		.sort((a, b) => a.r.enterAt - b.r.enterAt);
 	if (!strokes.length) return null;
 
 	const tipAt = ({r, state}: AnimatedItem, p: number, at: number): Vec => {
-		const path = r.geom.path!;
-		const tip = path.exactPointAt(path.length * p);
-		const local = {x: tip.x - path.bbox.x - path.bbox.w / 2, y: tip.y - path.bbox.y - path.bbox.h / 2};
+		const path = r.geom.path;
+		const tip = path?.exactPointAt(path.length * p);
+		const local = path && tip
+			? {x: tip.x - path.bbox.x - path.bbox.w / 2, y: tip.y - path.bbox.y - path.bbox.h / 2}
+			: r.geom.tipAt(p);
 		return carryGrip(at === t ? state : computeState(r, at, fps), local);
 	};
 

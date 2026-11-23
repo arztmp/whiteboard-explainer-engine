@@ -1,3 +1,4 @@
+import {revealAt} from './image-effects';
 // Chuẩn hoá element: điền giá trị mặc định theo style, tính hình học (box, đầu bút).
 import type {
 	EnterType,
@@ -176,9 +177,15 @@ const computeGeometry = (el: TimelineElement, font: FontKind, ctx: Ctx): Geometr
 	const y = el.y ?? 0;
 	const center = (w: number, h: number): Box => ({ox: -w / 2, oy: -h / 2, w, h});
 	switch (el.type) {
+		case 'morph':
+			return {box: center(1, 1), anchor: {x, y}, tipAt: () => ({x: 0, y: 0})};
 		case 'image': {
 			const size = imageSizeOf(ctx, el.src, el.w, el.h);
 			const box = center(size.w, size.h);
+			if (el.reveal) return {box, anchor: {x, y}, imageSize: size, tipAt: (p) => {
+				const tip = revealAt(p, el.reveal!.rows ?? 8);
+				return {x: (el.flipX ? 1 - tip.x : tip.x) * size.w + box.ox, y: tip.y * size.h + box.oy};
+			}};
 			const sc = getScribble(size.w, size.h, el.id);
 			const trace = el.trace ? ctx.traces[resolveAsset(ctx.videoId, el.src)] : undefined;
 			if (trace) {

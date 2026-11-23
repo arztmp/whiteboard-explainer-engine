@@ -95,7 +95,7 @@ export const TimelineVideo: React.FC<VideoProps> = ({videoId, timelineFile, time
 					<Html5Audio src={resolveAsset(videoId, c.src)} volume={c.volume ?? 0.35} />
 				</Sequence>
 			))}
-			{timeline.style === 'C' ? (
+			{timeline.style === 'C' && !timeline.sceneSlideLeft ? (
 				<Board tl={timeline} ctx={ctx} t={t} fontsOk={fontsOk} />
 			) : (
 				<SceneStack tl={timeline} ctx={ctx} t={t} fontsOk={fontsOk} />

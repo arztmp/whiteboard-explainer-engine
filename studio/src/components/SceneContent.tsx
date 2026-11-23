@@ -1,3 +1,4 @@
+import {MorphView, SpecialImageView} from './elements/ImageEffects';
 import React, {useMemo} from 'react';
 import {Img} from 'remotion';
 import {sampleSceneAnimation, type ElementState} from '../lib/anim';
@@ -25,7 +26,9 @@ const ElementBody: React.FC<{r: Resolved; s: ElementState; ctx: Ctx; t: number}>
 	const props = {r, s, ctx, t} as any;
 	switch (r.el.type) {
 		case 'image':
-			return <ImageView {...props} />;
+			return r.el.reveal || r.el.scatter ? <SpecialImageView {...props} /> : <ImageView {...props} />;
+		case 'morph':
+			return <MorphView {...props} />;
 		case 'text':
 			return <TextView {...props} />;
 		case 'counter':
@@ -90,7 +93,7 @@ export const SceneContent: React.FC<{
 		if (!hand || selected.kind !== 'draw') return null;
 		const url = resolveAsset(ctx.videoId, hand.src);
 		const nat = ctx.imageSizes[url] ?? {w: 400, h: 400};
-		const scale = hand.scale ?? 1;
+		const scale = (hand.scale ?? 1) * (penTravel?.scale ?? 1);
 		const pose = selected.pose;
 		if (!pose || pose.opacity <= 0.001) return null;
 		return (
