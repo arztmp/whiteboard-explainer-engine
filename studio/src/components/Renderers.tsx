@@ -40,6 +40,8 @@ const SceneLayer: React.FC<{
 	cam: Cam;
 }> = ({scene, tl, ctx, t, fontsOk, wrapper, cam, hideHands}) => {
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
+	const overlay = resolved.filter((item) => item.el.screenFixed);
+	const artwork = overlay.length ? resolved.filter((item) => !item.el.screenFixed) : resolved;
 	return (
 		<AbsoluteFill data-scene={scene.id} style={{background: scene.background ?? tl.background ?? (ctx.brand ? brand.white : '#F7F8FA'), overflow: 'hidden', ...wrapper}}>
 			<div
@@ -53,9 +55,10 @@ const SceneLayer: React.FC<{
 					transform: camTransform(cam, tl.width, tl.height),
 				}}
 			>
-				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="elements" />
-				{!hideHands && <SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />}
+				<SceneContent resolved={artwork} ctx={ctx} t={t} layer="elements" />
+				{!hideHands && <SceneContent resolved={artwork} ctx={ctx} t={t} layer="hands" penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />}
 			</div>
+			{overlay.length > 0 && <SceneContent resolved={overlay} ctx={ctx} t={t} layer="elements" />}
 		</AbsoluteFill>
 	);
 };

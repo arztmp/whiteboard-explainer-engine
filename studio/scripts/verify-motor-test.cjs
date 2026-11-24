@@ -108,6 +108,8 @@ async function main() {
 			if (car?.role==='background') {
 				const init=await at(f0,grip);
 				assert.deepEqual(init.center,[car.x,car.y]);
+				assert(car.x + car.w/2 < 0 || car.x-car.w/2 > 1920 ||
+					car.y + car.h/2 < 0 || car.y-car.h/2 > 1080, `BG starts inside viewport: ${scene.id}`);
 				assert(init.backgroundBehind,scene.id);
 				for(const t of [car.carry.land+.1, car.carry.end+.4, scene.end-1.2]){
 					const settled=await at(Math.ceil(t*30),grip);
@@ -159,8 +161,89 @@ async function main() {
 		assert.equal(await screenshot(draft.start+.5),await screenshot(draft.end-.8),'reassembled raster differs');
 		const required=['draw','slide','rotate','grow','fade','morph','zoom','scatter','reassemble','transform','layers','bg-two','audio','explainer'];
 		assert(required.every(id=>timeline.scenes.some(s=>s.id===id)));
+		const byId = (id) => timeline.scenes.find(s => s.id === id);
+		const sampleElement = async (scene, id, localTime) => {
+			await seek(Math.round((byId(scene).start + localTime) * 30));
+			return page.evaluate((id) => {
+				const el = document.querySelector(`[data-el="${id}"]`);
+				if (!el) return null;
+				const s = getComputedStyle(el);
+				const m = new DOMMatrix(s.transform === 'none' ? undefined : s.transform);
+				const p = el.getBoundingClientRect();
+				return {x:p.left,y:p.top,angle:Math.atan2(m.b,m.a)*180/Math.PI,scale:Math.hypot(m.a,m.b),
+					opacity:Number(s.opacity),scatter:el.querySelector('[data-scatter]')?.dataset.scatter ?? null,
+					morph:el.querySelector('[data-morph]')?.getAttribute('points') ?? null};
+			}, `${scene}:${id}`);
+		};
+		for (const [i,start] of [.5,1.4,2.3,3.2].entries()) {
+			const initial = await sampleElement('slide',`slide-${i}`,start);
+			const ending = await sampleElement('slide',`slide-${i}`,start+1.6);
+			assert(i<2 ? Math.abs(initial.x-ending.x)>700 : Math.abs(initial.y-ending.y)>600);
+		}
+		const cw = await sampleElement('rotate','cw',2.25);
+		const ccw = await sampleElement('rotate','ccw',2.25);
+		assert(cw.angle*ccw.angle<0&&Math.abs(cw.angle)>30);
+		const pivotBefore = await sampleElement('grow','pivot',1.1);
+		const pivotAfter = await sampleElement('grow','pivot',4);
+		assert(pivotBefore.scale<pivotAfter.scale && pivotBefore.x < pivotAfter.x-8);
+		assert((await sampleElement('fade','fade-item',1.5)).opacity<.5);
+		near((await sampleElement('fade','fade-item',3.3)).opacity,1);
+		assert((await sampleElement('fade','fade-item',5.7)).opacity<.8);
+		assert.equal(await sampleElement('fade','fade-item',7.2),null);
+		assert.notEqual((await sampleElement('morph','shape',1)).morph,(await sampleElement('morph','shape',5)).morph);
+		assert.notEqual((await sampleElement('morph','shape',5)).morph,(await sampleElement('morph','shape',9)).morph);
+		assert((await sampleElement('zoom','object',2.1)).scale>1.3);
+		near((await sampleElement('zoom','object',4.5)).scale,1);
+		const zoomCam = await sampleElement('zoom','camera-target',6.9);
+		const zoomRest = await sampleElement('zoom','camera-target',9.1);
+		assert(Math.abs(zoomCam.x-zoomRest.x)>50,'camera zoom did not alter apparent position');
+		const beforeScatter=await sampleElement('scatter','tiles',.5);
+		const split=await sampleElement('scatter','tiles',4.1);
+		assert(beforeScatter.scatter===null&&Number(split.scatter)>.9);
+		const analytic=[];
+		const audio=byId('audio').elements.find(e=>e.type==='caption').words;
+		const highlighted = async f => {
+			await seek(f);
+			return page.evaluate(() => [...document.querySelectorAll('[data-el="audio:captions"] span')]
+				.find(el=>!!el.style.transform)?.textContent ?? '');
+		};
+		for(const word of audio) {
+			const frame=Math.ceil(word.start*30-1e-8);
+			assert.notEqual(await highlighted(frame-1),word.text);
+			assert.equal(await highlighted(frame),word.text);
+			analytic.push({word:word.text,frame});
+		}
+		await seek(Math.round((byId('advanced').start+8.5)*30));
+		const hasStructures=await page.evaluate(() => ['mfrac','msqrt','msup','msub'].every(tag=>!!document.querySelector(`math ${tag}`)) &&
+			[...document.querySelectorAll('math')].some(el=>el.textContent.includes('∫')) &&
+			[...document.querySelectorAll('math')].some(el=>el.textContent.includes('∑')));
+		assert(hasStructures,'missing MathML structure');
+		const pixelComparisons={};
+		for(const id of ['full-one','full-two','svg']) {
+			const t=byId(id).end-.8;
+			const original=await screenshot(t);
+			await page.evaluate(async () => {
+				const img=document.querySelector('[data-illustration-final] img');
+				if(!img) throw new Error('no illustration final raster');
+				const b=img.getBoundingClientRect();
+				const reference=new Image();
+				reference.src=img.currentSrc;
+				Object.assign(reference.style,{position:'fixed',left:b.left+'px',top:b.top+'px',
+					width:b.width+'px',height:b.height+'px',zIndex:99999});
+				document.body.append(reference);
+				await reference.decode();
+				img.style.visibility='hidden';
+				window.__pixelReference={img,reference};
+			});
+			const {value:{data}}=await page._client().send('Page.captureScreenshot',{format:'png'});
+			assert.equal(data,original,`final source mismatch: ${id}`);
+			await page.evaluate(()=>{window.__pixelReference.img.style.visibility='';
+				window.__pixelReference.reference.remove();delete window.__pixelReference;});
+			pixelComparisons[id]={identicalPng:true,comparison:'same Chromium viewport'};
+		}
+		await writeFile(join(out,'pixel.json'),JSON.stringify({reassembly:true,sourceComparisons:pixelComparisons},null,2)+'\n');
 		const json={contactStats,penUpSamples:penUp,transitionSamples:seams,formulaVariants:formulae.size,
-			effectsPresent:required,pixelReassembly:true};
+			effectsPresent:required,pixelReassembly:true,visibleCueFrames:analytic};
 		await writeFile(join(out,'coordinates.csv'),records.join('\n')+'\n');
 		await writeFile(join(out,'browser.json'),JSON.stringify(json,null,2)+'\n');
 		console.log(JSON.stringify(json));

@@ -54,8 +54,8 @@ def math_display(id_, latex, x,y,size=48, **kw):
 
 def add(id_, title, dur, content, *, pen=None, white=False, camera=None):
     global clock
-    h = [rect(f"{id_}-title-panel", 960,105,1550,120,B,radius=20,z=20),
-         text(f"{id_}-title", title,960,105,48,z=21)]
+    h = [rect(f"{id_}-title-panel", 960,105,1550,120,B,radius=20,z=20,screenFixed=True),
+         text(f"{id_}-title", title,960,105,48,z=21,screenFixed=True)]
     items = h + list(content)
     # Use scene-qualified IDs to keep source plans reusable.
     for e in items:
@@ -83,6 +83,17 @@ def drag(id_, source, direction, *, target=(960,540), w=1920, h=None, start=.18,
         "bottom": ((x,1080+h/2+24),(0,-h/2+8),(x+140,1450),(2000,1370)),
     }
     (sx,sy),grip,origin,exit_ = options[direction]
+    if not background:
+        with Image.open(FILES[source]) as original:
+            alpha=np.asarray(original.convert("RGBA").getchannel("A"))
+            if direction in {"left","right"}:
+                edge=np.flatnonzero(alpha[ih//2]>128)
+                idx=edge[-1] if direction=="left" else edge[0]
+                grip=((idx/iw-.5)*w + (-3 if direction=="left" else 3),0)
+            else:
+                edge=np.flatnonzero(alpha[:,iw//2]>128)
+                idx=edge[-1] if direction=="top" else edge[0]
+                grip=(0,(idx/ih-.5)*h + (-3 if direction=="top" else 3))
     plan = dict(mode="drag",grip=v(*grip),target=v(x,y),start=clock+start,contact=clock+start+.8,
                 pickup=clock+start+1,land=clock+land,release=clock+land+.16,end=clock+finish,
                 **{"from":v(*origin),"to":v(*exit_)})
@@ -137,9 +148,9 @@ add("handwriting","Handwriting · A scientific title",19,[
 add("typography","Typography",7,[
     text("topic","Mass, distance and gravitational force",960,330,64,weight=800),
     text("subtitle","The same rules govern planets, stars and satellites",960,464,34,O),
-    text("body","Initial conditions determine the evolution of the system.",960,680,36,
-         weight=400,maxWidth=750,lineHeight=1.5,enter="slide",enterOffset=v(-180,0),enterAt=clock+1),
-    picture("galaxy",30,1465,722,360,enter="fade",enterAt=clock+1.6),
+    text("body","Initial conditions determine the evolution of the system.",720,680,36,
+         weight=400,maxWidth=650,lineHeight=1.5,enter="slide",enterOffset=v(-180,0),enterAt=clock+1),
+    picture("galaxy",30,1510,680,335,enter="fade",enterAt=clock+1.6),
 ],white=True)
 add("multiline","Multiline writing",24,[
     *write("multiline","Small changes can produce dramatically different outcomes.",280,478,80,1,19.1,
@@ -180,7 +191,7 @@ add("highlight","Formula writing and highlighting",13,[
 add("geometry","Geometry · Shapes and arrows",12,plot("geometry",[
     loop(405,386,92,92),loop(808,386,133,79),[(1090,300),(1270,300),(1270,480),(1090,480),(1090,300)],
     [(1390,312),(1640,312),(1640,480),(1390,480),(1390,312)],[(310,804),(432,590),(555,804),(310,804)],
-    loop(780,706,115,105,0,math.tau,6),[(960,655),(1130,655)],loop(1240,760,130,108,math.pi,math.tau),
+    loop(780,706,115,105,0,math.tau,6),[(960,655),(1130,655)],loop(1240,760,130,108,math.pi,math.tau),[(1352,725),(1370,760),(1390,730)],
     *[[(1380+i*36,680),(1396+i*36,680)] for i in range(7)],*arrow(340,923,660,923),
     *arrow(905,923,1190,923),*arrow(1190,923,905,923),
 ],.9,10.65),pen=.1)
@@ -300,12 +311,12 @@ add("explainer","Why three bodies are hard to predict",38,[
          960,304,37,weight=400,maxWidth=1410,lineHeight=1.45,enter="fade",enterAt=clock+.55),
     *diagram("explain",3,19,y=650),
     math_display("acceleration",r"\ddot{\mathbf r}_i=G\sum_{j\ne i}m_j\frac{\mathbf r_j-\mathbf r_i}{\|\mathbf r_j-\mathbf r_i\|^3}",
-                 920,918,46,enterAt=clock+18.7,enterDuration=.8,exit="fade",exitAt=clock+29.5,exitDuration=.8),
+                 920,955,46,enterAt=clock+18.7,enterDuration=.8,exit="fade",exitAt=clock+29.5,exitDuration=.8),
     *[dict(id=f"orbit-{i}",type="circle",x=x,y=y,r=23,fill=(O,C,R)[i],z=5,
         enter="fade",enterAt=clock+22,enterDuration=.4,exit="fade",exitAt=clock+28.5,exitDuration=.5,
         moves=[dict(at=clock+22.25,duration=5.8,x=tx,y=ty,via=v(px,py))])
       for i,(x,y,tx,ty,px,py) in enumerate([(495,565,1160,450,725,304),(970,755,1320,555,1470,870),(1440,585,480,820,885,920)])],
-    text("bridge","Each acceleration combines pulls from the other bodies.",960,980,23,
+    text("bridge","Each acceleration combines pulls from the other bodies.",960,1041,23,
          enter="fade",enterAt=clock+20,exit="fade",exitAt=clock+29,exitDuration=.8),
     picture("poincare",13,1280,617,450,enter="fade",enterAt=clock+30,enterDuration=1.15,z=10),
     rect("closing-panel",650,612,920,440,B,enterAt=clock+29.9,z=9,radius=22),
@@ -325,7 +336,8 @@ metadata=dict(style="B",width=1920,height=1080,fps=30,duration=clock,theme="bran
               sfx=[dict(src="cue.wav",at=w["start"],volume=.7) for w in words])
 assets=[dict(file=p.name,dimensions=SIZE[n],sha256=hashlib.sha256(p.read_bytes()).hexdigest(),
              role="background" if n in {2,20,32} else "foreground",
-             usage="Duplicate of S20" if n==32 else "See scene timeline") for n,p in sorted(FILES.items())]
+             usage="Duplicate of S20" if n==32 else [
+                 sc["id"] for sc in scenes if any(el.get("src")==p.name for el in sc["elements"])]) for n,p in sorted(FILES.items())]
 (OUT/"timeline.json").write_text(json.dumps(metadata,ensure_ascii=False,separators=(",",":"))+"\n")
 (OUT/"report.json").write_text(json.dumps(dict(duration=clock,cues=words,assets=assets,coverage=coverage,
                                             scenes=[dict(id=s["id"],start=s["start"],end=s["end"]) for s in scenes],

@@ -85,6 +85,7 @@ export interface Carry {
 export type FadeCurve = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 
 interface BaseElement {
+	screenFixed?: boolean;
 	id: string;
 	x?: number;
 	y?: number;

@@ -248,7 +248,9 @@ def compile_illustration(analysis, src, prefix, center, width, start, end, *, mo
         "originalSize": analysis["original"], "analysisSize": analysis["imageSize"],
         "detectedExteriorPaths": detected_outer, "detectedInteriorOrNativePaths": len(source)-detected_outer,
         "drawnExteriorPaths": drawn_outer, "drawnInteriorOrNativePaths": len(ordered)-drawn_outer,
-        "omittedPaths": len(source)-len(ordered), "selectedBudget": limit, "fillRegions": len(fills),
+        "omittedPaths": len(source)-len(ordered), "selectedBudget": limit,
+        "availableSeconds": round(end-start,3),
+        "allCandidateTimeLowerBoundSeconds": round(len(source)*.085 + sum(row[1] for row in source)*ratio/1800,3), "fillRegions": len(fills),
         "retainedPathLengthRatio": round(sum(row[1] for row in ordered)/max(1,sum(row[1] for row in source)), 4),
         "edgeDetection": analysis["detectors"], "lowerResolutionDetection": analysis["lowMetrics"],
     }
