@@ -124,7 +124,7 @@ add("regression", "Regresyon · Sürükleme, kayma ve büyüme", 8, [
           enterAt=clock+1.1, enterDuration=.9, moves=[dict(at=clock+3.4, duration=1.8, x=1320, rotate=8)]),
 ], white=True)
 
-timeline = dict(style="B", width=1920, height=1080, fps=30, duration=clock, font="sans", theme="brand",
+timeline = dict(allowLegacyRasterEffects=True, style="B", width=1920, height=1080, fps=30, duration=clock, font="sans", theme="brand",
                 sceneSlideLeft=True, scenes=scenes,
                 hand=dict(old["hand"], src="/hand-motion-demo/Kalem_El.png"),
                 carryHand=dict(old["carryHand"], src="/hand-motion-demo/El.png"))

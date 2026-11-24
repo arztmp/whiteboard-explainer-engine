@@ -117,12 +117,27 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				e.from.length < 3 || e.from.length !== e.to.length ||
 				![...e.from, ...e.to].every(validPoint) || !positive(e.duration) || !Number.isFinite(e.at)))
 				errs.push(`${w}: morph needs equally sized finite contours and a positive duration`);
+			if (e.type === 'path' && e.paintFor) {
+				const image = s.elements.find(item => item.id === e.paintFor!.imageId);
+				const segment = '[ML]-?\\d+(?:\\.\\d+)? -?\\d+(?:\\.\\d+)?';
+				if (image?.type !== 'image' || !image.penPaint || !travel || !e.hand ||
+					!['outline', 'detail', 'color'].includes(e.paintFor.phase) ||
+					!new RegExp(`^${segment}( ${segment})+$`).test(e.d) ||
+					e.moves?.length || e.carry || e.zoom || e.x || e.y || e.rotate ||
+					(e.scale ?? 1) !== 1 || !positive(e.strokeWidth ?? 0))
+					errs.push(`${w}: paint stroke requires a plain scene-coordinate polyline and a penPaint image from the same scene`);
+			}
 			if (e.type === 'path' && e.inkFade && (!Number.isFinite(e.inkFade.at) || !Number.isFinite(e.inkFade.end) ||
 				e.inkFade.end < e.inkFade.at || e.inkFade.at < (e.enterAt ?? s.start) + (e.enterDuration ?? 0) - .000002))
 				errs.push(`${w}: inkFade requires a valid interval after the pen stroke`);
 
 			if (e.type === 'image') {
-				const {reveal, scatter, illustration} = e;
+				const {reveal, scatter, illustration, penPaint} = e;
+				if (!tl.allowLegacyRasterEffects && (reveal || (illustration && !e.src.toLowerCase().endsWith('.svg'))))
+					errs.push(`${w}: use penPaint for raster drawing; legacy raster effects require explicit opt-in`);
+				if (penPaint && (e.enter !== 'none' || reveal || scatter || illustration || e.trace ||
+					e.video || e.moves?.length || e.carry || e.zoom || e.flipX || (e.scale ?? 1) !== 1 || e.rotate))
+					errs.push(`${w}: penPaint requires an untransformed source and associated pen strokes`);
 				if (illustration && (e.enter !== 'none' || reveal || scatter || e.trace || e.video ||
 					!Array.isArray(illustration.regions) || !illustration.regions.length ||
 					illustration.regions.some((r) => !r.d || !Number.isFinite(r.at) || !Number.isFinite(r.end) || r.at >= r.end)))

@@ -13,7 +13,8 @@ const {prepareServer} = require(join(renderer, 'prepare-server'));
 const {setPropsAndEnv} = require(join(renderer, 'set-props-and-env'));
 const {seekToFrame} = require(join(renderer, 'seek-to-frame'));
 const refinements = process.argv[3] === 'refinements';
-const inputProps = {videoId: 'motor-demo', timelineFile: refinements ? 'refinements.json' : 'timeline.json'};
+const drawTest = process.argv[3] === 'draw';
+const inputProps = {videoId: 'motor-demo', timelineFile: drawTest ? 'draw-test.json' : refinements ? 'refinements.json' : 'timeline.json'};
 const out = resolve(process.argv[2] ?? 'out/motor-demo');
 const browserExecutable = process.env.CHROME_PATH;
 const timeoutInMilliseconds = 30000;
@@ -34,7 +35,7 @@ async function main() {
 		const comp = await selectComposition({id: 'C', serveUrl: server.serveUrl, inputProps, puppeteerInstance: browser});
 		assert.deepEqual([comp.width, comp.height, comp.fps, comp.durationInFrames], [1920, 1080, 30, comp.props.timeline.duration * 30]);
 		const timeline = comp.props.timeline;
-		const tips = {pen: timeline.hand.tip, finger: timeline.carryHand.tip};
+		const tips = {pen: timeline.hand.tip, finger: timeline.carryHand?.tip};
 		const page = await browser.newPage({context: () => null, logLevel: 'error', indent: false,
 			pageIndex: 0, onBrowserLog: null, onLog: () => {}});
 		await page.setViewport({width: comp.width, height: comp.height, deviceScaleFactor: 1});
@@ -97,6 +98,7 @@ async function main() {
 						n.querySelector('math')?.innerHTML ?? '',n.getBoundingClientRect().width])};
 			}, tips, contact);
 		};
+		if (drawTest) return await require('./verify-draw-test.cjs')({timeline, seek, page, out});
 		if (refinements) return await require('./verify-motor-refinements.cjs')({timeline, seek, at, page, out});
 		assert.equal(timeline.scenes.length, 31);
 		const records=['frame,time_s,scene,phase,tip_x,tip_y,target_x,target_y,error_px'];

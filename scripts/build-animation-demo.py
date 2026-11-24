@@ -266,7 +266,7 @@ pcm = (np.sin(2 * math.pi * 750 * t) * np.minimum(1, t * 160) *
 with wave.open(str(OUT / "timing-tone.wav"), "wb") as output:
     output.setparams((1, 2, rate, len(pcm), "NONE", "not compressed"))
     output.writeframes(pcm.tobytes())
-timeline = dict(allowMorph=True, style="A", fps=30, width=1920, height=1080, duration=150, font="sans",
+timeline = dict(allowLegacyRasterEffects=True, allowMorph=True, style="A", fps=30, width=1920, height=1080, duration=150, font="sans",
                 sceneSlideLeft=True, hand=base["hand"], carryHand=base["carryHand"], scenes=scenes,
                 sfx=[dict(src="timing-tone.wav", at=word["start"], volume=.66) for word in words])
 (OUT / "timeline.json").write_text(json.dumps(timeline, ensure_ascii=False, indent=2) + "\n")

@@ -119,6 +119,8 @@ interface BaseElement {
 }
 
 export interface ImageElement extends BaseElement {
+	/** Raster painting is driven by plain scene-coordinate pen paths. */
+	penPaint?: boolean;
 	role?: 'background';
 	fitImage?: 'contain' | 'cover';
 	type: 'image';
@@ -231,6 +233,7 @@ export interface BarElement extends BaseElement {
 }
 
 export interface PathElement extends BaseElement {
+	paintFor?: {imageId: string; phase: 'outline' | 'detail' | 'color'};
 	inkFade?: {at: number; end: number};
 	type: 'path';
 	d: string;
@@ -388,6 +391,8 @@ export interface HandConfig {
 }
 
 export interface Timeline {
+	/** Opt in when replaying an archived strip or timed raster fill. */
+	allowLegacyRasterEffects?: boolean;
 	/** Retained for legacy acceptance scenes only. */
 	allowMorph?: boolean;
 	/** Accepts historical multidirectional background carries in the original regression fixture. */

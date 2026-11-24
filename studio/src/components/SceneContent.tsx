@@ -1,6 +1,7 @@
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import theme from '../theme.json';
+import {PenPaintView} from './elements/PenPaintView';
 import {IllustrationView} from './elements/IllustrationView';
 import {MorphView, SpecialImageView} from './elements/ImageEffects';
 import React, {useMemo} from 'react';
@@ -8,7 +9,7 @@ import {Img} from 'remotion';
 import {sampleSceneAnimation, type ElementState} from '../lib/anim';
 import {resolveAsset} from '../lib/assets';
 import {resolveElement, type Ctx, type Resolved} from '../lib/resolve';
-import type {HandConfig, Scene, Timeline} from '../types';
+import type {HandConfig, ImageElement, Scene, Timeline} from '../types';
 import {
 	BarView,
 	CaptionView,
@@ -139,7 +140,7 @@ export const SceneContent: React.FC<{
 	return (
 		<>
 			{items.map(({r, state: s}) => {
-				if (!s.visible) return null;
+				if (!s.visible || (r.el.type === 'path' && r.el.paintFor)) return null;
 				const tf = [
 					`translate(${s.dx.toFixed(2)}px, ${s.dy.toFixed(2)}px)`,
 					s.rotate ? `rotate(${s.rotate}deg)` : '',
@@ -162,7 +163,9 @@ export const SceneContent: React.FC<{
 							filter: r.el.inkShadow ? `drop-shadow(${r.el.inkShadow})` : undefined,
 						}}
 					>
-						<ElementBody r={r} s={s} ctx={ctx} t={t} />
+						{r.el.type === 'image' && r.el.penPaint
+							? <PenPaintView r={r as Resolved<ImageElement>} ctx={ctx} items={items} />
+							: <ElementBody r={r} s={s} ctx={ctx} t={t} />}
 					</div>
 				);
 			})}
