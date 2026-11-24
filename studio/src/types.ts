@@ -38,6 +38,8 @@ export interface CameraKey {
 }
 
 export interface Move {
+	via?: Vec;
+	z?: number;
 	at: number;
 	x?: number;
 	y?: number;
@@ -64,6 +66,7 @@ export interface TransitionIn {
 
 export interface Carry {
 	mode?: 'carry' | 'drag';
+	after?: Move[];
 	/** Scene-local positions. The target is the element anchor, grip is relative to that anchor. */
 	grip: Vec;
 	from: Vec;
@@ -91,6 +94,7 @@ interface BaseElement {
 	enterOffset?: Vec;
 	enterAngle?: number;
 	enterScale?: number;
+	growOrigin?: Vec;
 	enterCurve?: FadeCurve;
 	exitCurve?: FadeCurve;
 	zoom?: {at: number; in: number; hold?: number; out: number; scale: number; origin?: Vec};
@@ -110,6 +114,8 @@ interface BaseElement {
 }
 
 export interface ImageElement extends BaseElement {
+	role?: 'background';
+	fitImage?: 'contain' | 'cover';
 	type: 'image';
 	src: string;
 	w: number;
@@ -123,7 +129,7 @@ export interface ImageElement extends BaseElement {
 	illustration?: {regions: {d: string; at: number; end: number}[]};
 	reveal?: {rows?: number};
 	scatter?: {at: number; out: number; hold?: number; back: number; columns?: number; rows?: number;
-		direction?: Vec; returnDirection?: Vec};
+		direction?: Vec; returnDirection?: Vec; rotation?: number; fade?: number};
 	/** đoạn video thật (ghi màn hình…) phát trong khung ảnh, bắt đầu lúc enterAt; `src` là khung đại diện để lấy kích thước */
 	video?: string;
 	videoRate?: number;
@@ -292,6 +298,7 @@ export interface ClockElement extends BaseElement {
 
 /** Matched closed contour vertices in local pixels, ordered in the same winding direction. */
 export interface MorphElement extends BaseElement {
+	toFill?: string;
 	type: 'morph';
 	x: number;
 	y: number;
@@ -302,7 +309,17 @@ export interface MorphElement extends BaseElement {
 	fill?: string;
 }
 
+export interface FormulaElement extends BaseElement {
+	type: 'formula';
+	latex: string;
+	x: number;
+	y: number;
+	size?: number;
+	color?: string;
+}
+
 export type TimelineElement =
+	| FormulaElement
 	| MorphElement
 	| ImageElement
 	| TextElement

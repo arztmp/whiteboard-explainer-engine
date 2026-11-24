@@ -92,7 +92,7 @@ def regions(image, strength):
     return labels, masks
 
 
-def analyze(path, chrome, resolution=540):
+def analyze(path, chrome, resolution=540, *, connect=False):
     if path.suffix.lower() == ".svg":
         image, vectors, original = svg_geometry(path, chrome)
     else:
@@ -130,6 +130,36 @@ def analyze(path, chrome, resolution=540):
             label = int(labels[y, x])-1
             length = np.linalg.norm(np.diff(chunk, axis=0), axis=1).sum()
             candidates.append((exterior, length, label, chunk))
+    if connect and vectors is None:
+        # Join aligned fragments within a region. Remove isolated single-edge noise before routing.
+        joined = []
+        for group in sorted({(p[0], p[2]) for p in candidates}):
+            pool = [p[3] for p in candidates if (p[0], p[2]) == group and p[1] >= 5]
+            while pool:
+                route = pool.pop()
+                while pool:
+                    end = route[-1]
+                    tangent = end - route[-min(len(route), 4)]
+                    best = None
+                    for i, other in enumerate(pool):
+                        for reverse in (False, True):
+                            p = other[::-1] if reverse else other
+                            d = np.linalg.norm(end-p[0])
+                            if d > 3.5:
+                                continue
+                            outgoing = p[min(len(p)-1, 3)]-p[0]
+                            if np.dot(tangent, outgoing) < .15*np.linalg.norm(tangent)*np.linalg.norm(outgoing):
+                                continue
+                            if best is None or d < best[0]:
+                                best = (d, i, reverse)
+                    if best is None:
+                        break
+                    _, i, reverse = best
+                    other = pool.pop(i)
+                    route = np.concatenate((route, other[::-1] if reverse else other))
+                length = np.linalg.norm(np.diff(route, axis=0), axis=1).sum()
+                joined.append((group[0], length, group[1], route))
+        candidates = joined
     low = image.copy()
     low.thumbnail((270, 270))
     _, _, _, low_metrics = raster_edges(low)
@@ -141,6 +171,9 @@ def compile_illustration(analysis, src, prefix, center, width, start, end, *, mo
     """Emit native pen paths plus independently timed SVG mask regions for full mode."""
     if mode not in {"trace", "full"}:
         raise ValueError(f"Unsupported illustration planning mode: {mode}")
+    if limit is None:
+        # Preserve time for pen-up and short marks. The actual planner still rejects an infeasible schedule.
+        limit = max(len(analysis["masks"]), round((end-start)*4))
     w, h = analysis["imageSize"]
     ratio = width / w
     height = width * analysis["original"][1] / analysis["original"][0]
@@ -215,7 +248,7 @@ def compile_illustration(analysis, src, prefix, center, width, start, end, *, mo
         "originalSize": analysis["original"], "analysisSize": analysis["imageSize"],
         "detectedExteriorPaths": detected_outer, "detectedInteriorOrNativePaths": len(source)-detected_outer,
         "drawnExteriorPaths": drawn_outer, "drawnInteriorOrNativePaths": len(ordered)-drawn_outer,
-        "omittedPaths": len(source)-len(ordered), "fillRegions": len(fills),
+        "omittedPaths": len(source)-len(ordered), "selectedBudget": limit, "fillRegions": len(fills),
         "retainedPathLengthRatio": round(sum(row[1] for row in ordered)/max(1,sum(row[1] for row in source)), 4),
         "edgeDetection": analysis["detectors"], "lowerResolutionDetection": analysis["lowMetrics"],
     }

@@ -178,6 +178,7 @@ const computeGeometry = (el: TimelineElement, font: FontKind, ctx: Ctx): Geometr
 	const y = el.y ?? 0;
 	const center = (w: number, h: number): Box => ({ox: -w / 2, oy: -h / 2, w, h});
 	switch (el.type) {
+		case 'formula':
 		case 'morph':
 			return {box: center(1, 1), anchor: {x, y}, tipAt: () => ({x: 0, y: 0})};
 		case 'image': {

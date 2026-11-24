@@ -1,6 +1,6 @@
 import type {Timeline, TimelineElement, Vec} from '../types';
 
-const ELEMENT_TYPES = ['morph', 'image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
+const ELEMENT_TYPES = ['formula', 'morph', 'image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
 const ENTERS = ['slide', 'rotate', 'pop', 'slide-up', 'slide-left', 'slide-right', 'fade', 'draw', 'grow', 'none'];
 const EXITS = ['fade', 'slide-down', 'shrink', 'none'];
 const TRANSITIONS = ['none', 'fade', 'push-left', 'push-up', 'zoom-from', 'pan'];
@@ -8,6 +8,7 @@ const TRANSITIONS = ['none', 'fade', 'push-left', 'push-up', 'zoom-from', 'pan']
 const REQUIRED: Record<string, string[]> = {
 	image: ['src', 'w', 'x', 'y'],
 	morph: ['x', 'y', 'from', 'to', 'at', 'duration'],
+	formula: ['x','y','latex'],
 	text: ['text', 'x', 'y'],
 	counter: ['from', 'to', 'x', 'y'],
 	card: ['w', 'h', 'x', 'y'],
@@ -140,6 +141,8 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				(e.zoom.origin && !validPoint(e.zoom.origin))))
 				errs.push(`${w}: invalid zoom timing, scale or origin`);
 
+			if (e.carry?.after?.some((m) => m.at < e.carry!.release))
+				errs.push(`${w}: post-drag motion starts after release`);
 			if (e.carry) {
 				const c = e.carry;
 				if (c.mode !== undefined && c.mode !== 'carry' && c.mode !== 'drag')
@@ -155,6 +158,8 @@ export const validateTimeline = (tl: Timeline): string[] => {
 					errs.push(`${w}: carry.lift must be finite and nonnegative`);
 				if (c.contact < (e.enterAt ?? s.start) || (e.exitAt != null && c.release > e.exitAt))
 					errs.push(`${w}: the element must be on screen from contact to release`);
+				if (travel && c.start < travel.end && travel.start < c.end)
+					errs.push(`${w}: carry and pen travel intervals overlap`);
 				carries.push({start: c.start, end: c.end, id: e.id});
 			}
 		});

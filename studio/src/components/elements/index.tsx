@@ -126,7 +126,7 @@ export const ImageView: React.FC<ElProps<ImageElement>> = ({r, s, ctx}) => {
 			) : (
 				<Img
 					src={url}
-					style={{position: 'absolute', left: 0, top: 0, width: w, height: h, opacity: solid, transform: flip}}
+					style={{position: 'absolute', left: 0, top: 0, width: w, height: h, objectFit: el.fitImage, opacity: solid, transform: flip}}
 				/>
 			)}
 			{drawing && traced ? (

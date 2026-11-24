@@ -24,9 +24,9 @@ export const SpecialImageView: React.FC<ElProps<ImageElement>> = ({r, s, ctx, t}
 				{Array.from({length: columns * rows}, (_, i) => {
 					const x = (i % columns) * tileW;
 					const y = Math.floor(i / columns) * tileH;
-					const {x: dx, y: dy, angle} = tileOffset(el.id, i, scatter.amount, scatter.direction);
+					const {x: dx, y: dy, angle} = tileOffset(el.id, i, scatter.amount, scatter.direction, el.scatter!.rotation);
 					return (
-						<svg key={i} x={x + dx} y={y + dy} width={tileW} height={tileH}
+						<svg key={i} opacity={1 - (el.scatter!.fade ?? 0) * scatter.amount} x={x + dx} y={y + dy} width={tileW} height={tileH}
 							viewBox={`${x} ${y} ${tileW} ${tileH}`} transform={`rotate(${angle} ${x + dx + tileW / 2} ${y + dy + tileH / 2})`}>
 							<use href={`#${id}`} />
 						</svg>
@@ -42,11 +42,11 @@ export const SpecialImageView: React.FC<ElProps<ImageElement>> = ({r, s, ctx, t}
 };
 
 export const MorphView: React.FC<ElProps<MorphElement>> = ({r, t}) => {
-	const {from, to, at, duration, fill} = r.el;
+	const {from, to, at, duration, fill, toFill} = r.el;
 	const p = easeInOut(progress(t, at, duration));
 	return (
 		<svg width={1} height={1} style={{position: 'absolute', overflow: 'visible'}}>
-			<polygon data-morph={p} points={morphAt(from, to, p)} fill={fill ?? '#244559'} />
+			<polygon data-morph={p} points={morphAt(from, to, p)} fill={fill ?? '#244559'} style={toFill ? {fill: `color-mix(in srgb, ${fill ?? '#244559'} ${(1 - p) * 100}%, ${toFill})`} : undefined} />
 		</svg>
 	);
 };

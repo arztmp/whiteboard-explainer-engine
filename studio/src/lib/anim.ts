@@ -1,10 +1,11 @@
 // Trạng thái animation của 1 element tại thời điểm t (giây tuyệt đối). Hàm thuần.
 import {spring} from 'remotion';
-import type {FadeCurve, PenTravel, Vec} from '../types';
+import type {FadeCurve, Move, PenTravel, Vec} from '../types';
 import {clamp, easeDraw, easeIn, easeInOut, easeOut, lerp, progress} from './math';
 import type {Resolved} from './resolve';
 
 export interface ElementState {
+	z: number;
 	visible: boolean;
 	/** điểm neo sau moves (toạ độ scene) */
 	x: number;
@@ -34,10 +35,34 @@ const fadeAt = (p: number, curve?: FadeCurve) => {
 	}
 };
 
+const applyMoves = (state: ElementState, moves: Move[] | undefined, t: number, offset?: Vec) => {
+	if (!moves?.length) return;
+	for (const move of [...moves].sort((a, b) => a.at - b.at)) {
+		if (t < move.at) break;
+		const p = easeInOut(progress(t, move.at, move.duration ?? .6));
+		const targetX = move.x === undefined ? state.x : move.x + (offset?.x ?? 0);
+		const targetY = move.y === undefined ? state.y : move.y + (offset?.y ?? 0);
+		if (move.via) {
+			const vx = move.via.x + (offset?.x ?? 0);
+			const vy = move.via.y + (offset?.y ?? 0);
+			state.x = lerp(lerp(state.x, vx, p), lerp(vx, targetX, p), p);
+			state.y = lerp(lerp(state.y, vy, p), lerp(vy, targetY, p), p);
+		} else {
+			state.x = lerp(state.x, targetX, p);
+			state.y = lerp(state.y, targetY, p);
+		}
+		if (move.scale !== undefined) state.scale = lerp(state.scale, move.scale, p);
+		if (move.rotate !== undefined) state.rotate = lerp(state.rotate, move.rotate, p);
+		if (move.opacity !== undefined) state.opacity = lerp(state.opacity, move.opacity, p);
+		if (move.z !== undefined) state.z = move.z;
+	}
+};
+
 export const computeState = (r: Resolved, t: number, fps: number): ElementState => {
 	const {el, geom} = r;
 	const s: ElementState = {
 		visible: true,
+		z: el.z ?? (el.type === 'image' && el.role === 'background' ? -1000 : 0),
 		x: geom.anchor.x,
 		y: geom.anchor.y,
 		dx: 0,
@@ -50,21 +75,7 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		grayscale: 0,
 	};
 
-	// --- moves (tích luỹ, easeInOut) ---
-	if (el.moves && el.moves.length) {
-		const ms = [...el.moves].sort((a, b) => a.at - b.at);
-		const isPath = el.type === 'path';
-		for (const m of ms) {
-			if (t < m.at) break;
-			const p = easeInOut(progress(t, m.at, m.duration ?? 0.6));
-			// path: x/y của move là độ lệch so với vị trí gốc
-			if (m.x !== undefined) s.x = lerp(s.x, isPath ? geom.anchor.x + m.x : m.x, p);
-			if (m.y !== undefined) s.y = lerp(s.y, isPath ? geom.anchor.y + m.y : m.y, p);
-			if (m.scale !== undefined) s.scale = lerp(s.scale, m.scale, p);
-			if (m.rotate !== undefined) s.rotate = lerp(s.rotate, m.rotate, p);
-			if (m.opacity !== undefined) s.opacity = lerp(s.opacity, m.opacity, p);
-		}
-	}
+	applyMoves(s, el.moves, t, el.type === 'path' ? geom.anchor : undefined);
 
 	// --- enter ---
 	if (t < r.enterAt) {
@@ -117,7 +128,15 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 				break;
 			case 'grow':
 				// bar tự mọc chiều cao; các loại khác phóng to từ 0
-				if (el.type !== 'bar') s.scale *= lerp(el.enterScale ?? 0, 1, easeOut(p));
+				if (el.type !== 'bar') {
+					const f = lerp(el.enterScale ?? 0, 1, easeOut(p));
+					if (el.growOrigin) {
+						const pivot = toScene(s, el.growOrigin);
+						s.dx += (pivot.x - s.x - s.dx) * (1 - f);
+						s.dy += (pivot.y - s.y - s.dy) * (1 - f);
+					}
+					s.scale *= f;
+				}
 				s.opacity *= clamp(p * 3, 0, 1);
 				break;
 			case 'draw':
@@ -275,6 +294,7 @@ export const animateCarry = (r: Resolved, t: number, fps: number, base = compute
 		state.dx = 0;
 		state.dy = 0;
 	}
+	if (t >= c.release) applyMoves(state, c.after, t);
 	if (t >= c.end || (t < c.release && !state.visible)) return {state, hand: null};
 
 	const grip = carryGrip(state, c.grip);
@@ -342,7 +362,7 @@ const travelPen = (items: AnimatedItem[], travel: PenTravel, t: number, fps: num
 /** One frame sample drives the drawing, any attached object, and the scene's only hand. */
 export const sampleSceneAnimation = (resolved: Resolved[], t: number, fps: number, penTravel?: PenTravel) => {
 	const items = resolved.map((r, i) => ({r, i, ...animateCarry(r, t, fps)}))
-		.sort((a, b) => (a.r.el.z ?? 0) - (b.r.el.z ?? 0) || a.i - b.i);
+		.sort((a, b) => a.state.z - b.state.z || a.i - b.i);
 	const carry = items.find((item) => item.hand)?.hand;
 	if (carry) return {items, hand: {kind: 'carry' as const, pose: carry}};
 	const pose = penTravel ? travelPen(items, penTravel, t, fps)

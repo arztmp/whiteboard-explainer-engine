@@ -27,12 +27,12 @@ export const scatterAt = (effect: NonNullable<ImageElement['scatter']>, t: numbe
 	return {amount: p, direction: {x: lerp(from.x, to.x, blend), y: lerp(from.y, to.y, blend)}};
 };
 
-export const tileOffset = (id: string, index: number, amount: number, direction: Vec) => {
+export const tileOffset = (id: string, index: number, amount: number, direction: Vec, rotation = 62) => {
 	const rand = seededRandom(`${id}:${index}`);
 	const angle = rand() * 2 * Math.PI;
 	const radius = 65 + rand() * 135;
 	return {x: (direction.x + radius * Math.cos(angle)) * amount,
-		y: (direction.y + radius * Math.sin(angle)) * amount, angle: (rand() - 0.5) * 62 * amount};
+		y: (direction.y + radius * Math.sin(angle)) * amount, angle: (rand() - 0.5) * rotation * amount};
 };
 
 export const morphAt = (from: Vec[], to: Vec[], p: number) =>
