@@ -97,6 +97,35 @@ def _paint_routes(image, strength, alpha):
     return routes
 
 
+def _shading_families(paths):
+    """Find repeated straight tracks near each other, with no invented ink."""
+    tracks = []
+    for index, (points, _, _) in enumerate(paths):
+        length = _length(points)
+        axis = points[-1] - points[0]
+        span = np.linalg.norm(axis)
+        if 5 <= length <= 42 and span >= .81*length:
+            tracks.append((index, points.mean(axis=0), axis/span))
+    families = {}
+    for index, center, axis in tracks:
+        parallel = cross = 0
+        for other_index, other_center, other_axis in tracks:
+            if index == other_index:
+                continue
+            offset = other_center-center
+            if np.linalg.norm(offset) > 20:
+                continue
+            alignment = abs(np.dot(axis, other_axis))
+            separation = abs(np.dot(offset, [-axis[1],axis[0]]))
+            if alignment > .94 and 1.4 < separation < 12:
+                parallel += 1
+            elif alignment < .74 and separation < 11:
+                cross += 1
+        if parallel >= 2:
+            families[index] = "crossHatchCandidates" if cross >= 2 else "hatchCandidates"
+    return families
+
+
 def _ink_routes(profile, strength, ratio, full):
     chosen = {"outline": [], "detail": []}
     total = {"outline": 0., "detail": 0.}
@@ -117,16 +146,41 @@ def _ink_routes(profile, strength, ratio, full):
     # Pick extended, high-contrast structural paths first. The useful detail
     # length grows with image complexity rather than a fixed number of strokes.
     detail_budget = (43 if full else 25) * np.sqrt(total["detail"])
-    extra = sorted(chosen["detail"], key=lambda item: -_length(item[0]))
+    pool = chosen["detail"]
+    order = sorted(range(len(pool)), key=lambda i: -_length(pool[i][0]))
     chosen["detail"] = []
+    kept = set()
     used = 0.
-    for path in extra:
+    for index in order:
+        path = pool[index]
         length = _length(path[0])*ratio
         if used + length <= detail_budget:
             chosen["detail"].append(path)
+            kept.add(index)
             used += length
+    families = _shading_families(pool) if full else {}
+    shading = []
+    extra = 0.
+    for index in sorted(families, key=lambda i: (families[i] != "crossHatchCandidates", -_length(pool[i][0]))):
+        if index in kept:
+            continue
+        length = _length(pool[index][0])*ratio
+        if extra + length <= .13*detail_budget:
+            shading.append(pool[index])
+            kept.add(index)
+            extra += length
     coverage = {phase: {"selected": len(paths), "selectedEdgeLengthPx": round(sum(_length(p)*ratio for p, _, _ in paths)),
                         "candidateEdgeLengthPx": round(total[phase])} for phase, paths in chosen.items()}
+    if full:
+        coverage["detail"]["selected"] += len(shading)
+        coverage["detail"]["selectedEdgeLengthPx"] += round(extra)
+        coverage["detail"]["shading"] = {
+            family: {"detected": sum(v==family for v in families.values()),
+                     "selected": sum(families.get(i)==family for i in kept)}
+            for family in ("hatchCandidates", "crossHatchCandidates")
+        }
+        # Keep texture marks together after the larger structural details.
+        chosen["shading"] = shading
     return chosen, coverage
 
 
