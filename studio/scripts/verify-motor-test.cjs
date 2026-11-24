@@ -222,23 +222,22 @@ async function main() {
 		for(const id of ['full-one','full-two','svg']) {
 			const t=byId(id).end-.8;
 			const original=await screenshot(t);
-			await page.evaluate(async () => {
+			const source=byId(id).elements.find(e=>e.illustration).src;
+			await page.evaluate(async (expected) => {
 				const img=document.querySelector('[data-illustration-final] img');
-				if(!img) throw new Error('no illustration final raster');
-				const b=img.getBoundingClientRect();
+				if(!img || !img.currentSrc.endsWith(expected)) throw new Error('wrong illustration source raster');
+				// Register the independent source image in the same parent and CSS box.
 				const reference=new Image();
 				reference.src=img.currentSrc;
-				Object.assign(reference.style,{position:'fixed',left:b.left+'px',top:b.top+'px',
-					width:b.width+'px',height:b.height+'px',zIndex:99999});
-				document.body.append(reference);
+				reference.style.cssText=img.style.cssText;
 				await reference.decode();
-				img.style.visibility='hidden';
+				img.replaceWith(reference);
 				window.__pixelReference={img,reference};
-			});
+			},source);
 			const {value:{data}}=await page._client().send('Page.captureScreenshot',{format:'png'});
-			assert.equal(data,original,`final source mismatch: ${id}`);
-			await page.evaluate(()=>{window.__pixelReference.img.style.visibility='';
-				window.__pixelReference.reference.remove();delete window.__pixelReference;});
+			assert(data===original,`final source mismatch: ${id}`);
+			await page.evaluate(()=>{window.__pixelReference.reference.replaceWith(window.__pixelReference.img);
+				delete window.__pixelReference;});
 			pixelComparisons[id]={identicalPng:true,comparison:'same Chromium viewport'};
 		}
 		await writeFile(join(out,'pixel.json'),JSON.stringify({reassembly:true,sourceComparisons:pixelComparisons},null,2)+'\n');
