@@ -121,7 +121,7 @@ def arrow(x,y,xx,yy):
                            (xx-22*math.cos(a+.55),yy-22*math.sin(a+.55))]
 
 
-def diagram(prefix,first,last, y=580):
+def diagram(prefix,first,last, y=580, motion=None):
     pts=[(495,y-85),(970,y+105),(1440,y-65)]
     routes=[loop(960,y+8,585,235,.2,math.tau+.2)]
     for x,py in pts: routes.append(loop(x,py,45,45))
@@ -129,10 +129,18 @@ def diagram(prefix,first,last, y=580):
         routes.extend(arrow(x+53,py,xx-53,yy))
     routes += [[(530,y-244),(1390,y-244)],[(530,y-259),(530,y-229)],[(1390,y-259),(1390,y-229)]]
     result=plot(prefix,routes,first,last)
+    if motion:
+        for stroke in result[1:]:
+            stroke["inkFade"] = dict(at=clock+21.7,end=clock+22.16)
     for i,(x,yy) in enumerate(pts):
-        result.append(dict(id=f"{prefix}-body-{i}",type="circle",x=x,y=yy,r=40,fill=(O,C,R)[i],
-                           enter="fade", enterAt=clock+first+(last-first)*.53,enterDuration=.85,z=-1))
-    result.append(text(f"{prefix}-distance","Separation r",960,y-270,24,enter="fade",enterAt=clock+last-.4))
+        body = dict(id=f"{prefix}-body-{i}",type="circle",x=x,y=yy,r=40,fill=(O,C,R)[i],
+                    enter="fade", enterAt=clock+first+(last-first)*.53,enterDuration=.85,z=-1)
+        if motion:
+            tx,ty,px,py=motion[i]
+            body["moves"]=[dict(at=clock+22.25,duration=5.8,x=tx,y=ty,via=v(px,py))]
+        result.append(body)
+    options = {"exit": "fade", "exitAt": clock+21.7, "exitDuration": .46} if motion else {}
+    result.append(text(f"{prefix}-distance","Separation r",960,y-270,24,enter="fade",enterAt=clock+last-.4,**options))
     return result
 
 
@@ -309,13 +317,12 @@ add("explainer","Why three bodies are hard to predict",38,[
     rect("panel",960,300,1550,179,W,z=-2),
     text("opening","Two bodies can trace a regular orbit. Add a third and each path changes with the others.",
          960,304,37,weight=400,maxWidth=1410,lineHeight=1.45,enter="fade",enterAt=clock+.55),
-    *diagram("explain",3,19,y=650),
+    *diagram("explain",3,19,y=650, motion=[
+        (1160,450,725,304),(1320,555,1470,870),(480,820,885,920)]),
+    text("motion-note","Illustrative trajectories",960,382,24,weight=400,
+         enter="fade",enterAt=clock+22.2,exit="fade",exitAt=clock+29,exitDuration=.45),
     math_display("acceleration",r"\ddot{\mathbf r}_i=G\sum_{j\ne i}m_j\frac{\mathbf r_j-\mathbf r_i}{\|\mathbf r_j-\mathbf r_i\|^3}",
                  920,955,46,enterAt=clock+18.7,enterDuration=.8,exit="fade",exitAt=clock+29.5,exitDuration=.8),
-    *[dict(id=f"orbit-{i}",type="circle",x=x,y=y,r=23,fill=(O,C,R)[i],z=5,
-        enter="fade",enterAt=clock+22,enterDuration=.4,exit="fade",exitAt=clock+28.5,exitDuration=.5,
-        moves=[dict(at=clock+22.25,duration=5.8,x=tx,y=ty,via=v(px,py))])
-      for i,(x,y,tx,ty,px,py) in enumerate([(495,565,1160,450,725,304),(970,755,1320,555,1470,870),(1440,585,480,820,885,920)])],
     text("bridge","Each acceleration combines pulls from the other bodies.",960,1041,23,
          enter="fade",enterAt=clock+20,exit="fade",exitAt=clock+29,exitDuration=.8),
     picture("poincare",13,1280,617,450,enter="fade",enterAt=clock+30,enterDuration=1.15,z=10),
