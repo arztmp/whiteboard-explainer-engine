@@ -337,7 +337,7 @@ time=np.arange(round(.24*rate))/rate
 tone=(np.sin(2*math.pi*630*time)*np.clip(time*150,0,1)*np.clip((.24-time)*150,0,1)*15000).astype("<i2")
 with wave.open(str(OUT/"cue.wav"),"wb") as dest:
     dest.setparams((1,2,rate,len(tone),"NONE","not compressed"));dest.writeframes(tone.tobytes())
-metadata=dict(allowMorph=True,style="B",width=1920,height=1080,fps=30,duration=clock,theme="brand",font="sans",sceneSlideLeft=True,
+metadata=dict(allowMorph=True,allowLegacyBackgroundPlacement=True,style="B",width=1920,height=1080,fps=30,duration=clock,theme="brand",font="sans",sceneSlideLeft=True,
               scenes=scenes,hand=dict(original["hand"],src="/hand-motion-demo/Kalem_El.png"),
               carryHand=dict(original["carryHand"],src="/hand-motion-demo/El.png"),
               sfx=[dict(src="cue.wav",at=w["start"],volume=.7) for w in words])

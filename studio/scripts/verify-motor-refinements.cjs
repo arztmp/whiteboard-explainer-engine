@@ -8,7 +8,7 @@ module.exports = async ({timeline, seek, at, page, out}) => {
 	const fixture = JSON.parse(await readFile('public/motor-demo/refinements-report.json', 'utf8'));
 	const csv = ['frame,test,actual_x,actual_y,expected_x,expected_y,error_px'];
 	const backgrounds = [];
-	assert(!timeline.allowMorph && !timeline.scenes.some(s => s.elements.some(e => e.type === 'morph')));
+	assert(!timeline.allowLegacyBackgroundPlacement && !timeline.allowMorph && !timeline.scenes.some(s => s.elements.some(e => e.type === 'morph')));
 	assert.equal(fixture.formulas.length, 14);
 	for (const scene of timeline.scenes.slice(0,2)) {
 		const bg = scene.elements.find(e => e.role === 'background');

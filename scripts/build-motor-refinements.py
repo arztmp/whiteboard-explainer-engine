@@ -74,7 +74,7 @@ def push(id_, source):
                            clock+.14, clock+4.5, clock+5.35)
 
 
-bg, alpha = push("landscape-a", "S02")
+bg, alpha = push("landscape-a", "S20")
 note, _ = handwriting("Gravity shapes worlds.", 245, 279, 65, color=white, width=5)
 note_elements = schedule(note, 6.4, 12.6, "ink-landscape-note")
 for stroke in note_elements:
@@ -87,10 +87,10 @@ add("background-one", "Gravity on the whiteboard", 22, [
     *formula("gravity-bg", "F = Gm₁m₂/r²", gravity, 1060, 273, 93, 13.25, 19.7, white, dark_ink_shadow),
 ], pen=5.45, heading=dict(color=white, inkShadow=dark_ink_shadow, enterAt=5.45))
 
-bg, _ = push("landscape-b", "S20")
+bg, _ = push("landscape-b", "S02")
 add("background-two", "A second landscape", 11, [
     bg,
-    text("bright-text", "Motion across the surface", 1030, 836, 43, navy, inkShadow=light_ink_shadow,
+    text("bright-text", "Motion across the surface", 970, 860, 49, navy, inkShadow=light_ink_shadow,
          enterAt=clock+5.45, screenFixed=True, weight=800)
 ], heading=dict(color=white, inkShadow=dark_ink_shadow, enterAt=clock+5.45))
 
@@ -147,7 +147,7 @@ for id_ in ("reveal", "full-one", "svg", "draw", "slide", "rotate", "grow", "fad
     scenes.append(shift_times(deepcopy(original), clock-original["start"]))
     clock = scenes[-1]["end"]
 
-timeline = {key: value for key, value in legacy.items() if key not in {"sfx", "allowMorph"}}
+timeline = {key: value for key, value in legacy.items() if key not in {"sfx", "allowMorph", "allowLegacyBackgroundPlacement"}}
 timeline.update(scenes=scenes, duration=clock)
 report = dict(duration=clock, handAlpha=alpha, handHeight=300, backgroundInset=150, formulas=equations,
               scenes=[{key: scene[key] for key in ("id", "start", "end")} for scene in scenes],

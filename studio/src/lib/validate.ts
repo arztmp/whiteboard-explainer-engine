@@ -150,6 +150,11 @@ export const validateTimeline = (tl: Timeline): string[] => {
 					errs.push(`${w}: carry.mode must be "carry" or "drag"`);
 				const times = [c.start, c.contact, c.pickup, c.land, c.release, c.end];
 				if (c.handScale !== undefined && !positive(c.handScale)) errs.push(`${w}: carry.handScale must be finite and positive`);
+				if (e.type === 'image' && e.role === 'background' && !tl.allowLegacyBackgroundPlacement &&
+					(c.mode !== 'drag' || !c.target || (e.x ?? 0) - e.w / 2 < tl.width ||
+					 c.target.x >= (e.x ?? 0) || (e.y ?? tl.height / 2) !== c.target.y ||
+					 c.handScale === undefined || Boolean(c.after?.length)))
+					errs.push(`${w}: background carry must enter from the right with a calibrated hand and stay at its target`);
 				if (!tl.carryHand) errs.push(`${w}: carry requires timeline.carryHand`);
 				if (![c.grip, c.target, c.from, c.to].every(validPoint))
 					errs.push(`${w}: carry requires finite grip, target, from and to points`);

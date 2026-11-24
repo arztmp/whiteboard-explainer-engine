@@ -390,6 +390,8 @@ export interface HandConfig {
 export interface Timeline {
 	/** Retained for legacy acceptance scenes only. */
 	allowMorph?: boolean;
+	/** Accepts historical multidirectional background carries in the original regression fixture. */
+	allowLegacyBackgroundPlacement?: boolean;
 	style: Style;
 	fps: number;
 	width: number;
