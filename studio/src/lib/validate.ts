@@ -112,6 +112,7 @@ export const validateTimeline = (tl: Timeline): string[] => {
 			if (e.type === 'text' && ex.mark !== undefined && !['khoanh', 'gach_chan'].includes(ex.mark as string))
 				errs.push(`${w}: mark phải là "khoanh" hoặc "gach_chan" (${String(ex.mark)})`);
 			const positive = (n: number) => Number.isFinite(n) && n > 0;
+			if (e.type === 'morph' && tl.allowMorph !== true) errs.push(`${w}: MORPH is disabled unless explicitly enabled for a legacy timeline`);
 			if (e.type === 'morph' && (!Array.isArray(e.from) || !Array.isArray(e.to) ||
 				e.from.length < 3 || e.from.length !== e.to.length ||
 				![...e.from, ...e.to].every(validPoint) || !positive(e.duration) || !Number.isFinite(e.at)))
@@ -148,10 +149,11 @@ export const validateTimeline = (tl: Timeline): string[] => {
 				if (c.mode !== undefined && c.mode !== 'carry' && c.mode !== 'drag')
 					errs.push(`${w}: carry.mode must be "carry" or "drag"`);
 				const times = [c.start, c.contact, c.pickup, c.land, c.release, c.end];
+				if (c.handScale !== undefined && !positive(c.handScale)) errs.push(`${w}: carry.handScale must be finite and positive`);
 				if (!tl.carryHand) errs.push(`${w}: carry requires timeline.carryHand`);
 				if (![c.grip, c.target, c.from, c.to].every(validPoint))
 					errs.push(`${w}: carry requires finite grip, target, from and to points`);
-				if (!times.every((at, i) => Number.isFinite(at) && (i === 0 || at > times[i - 1])) ||
+				if (!times.every((at, i) => Number.isFinite(at) && (i === 0 || at > times[i - 1] || (i === 4 && c.mode === "drag" && at === times[i - 1]))) ||
 					c.start < s.start || c.end > Math.min(s.end, tl.duration))
 					errs.push(`${w}: carry timestamps must increase and fit within the scene`);
 				if (c.lift !== undefined && (!Number.isFinite(c.lift) || c.lift < 0))

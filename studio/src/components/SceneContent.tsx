@@ -92,7 +92,7 @@ export const SceneContent: React.FC<{
 			const pose = selected.pose;
 			const src = resolveAsset(ctx.videoId, carryHand.src);
 			const nat = ctx.imageSizes[src] ?? {w: 400, h: 400};
-			const scale = carryHand.scale ?? 1;
+			const scale = pose.scale ?? carryHand.scale ?? 1;
 			const {columns, rows} = carryHand.grid ?? {columns: 1, rows: 1};
 			const index = Math.round(pose.closed * (columns * rows - 1));
 			const width = nat.w * scale / columns;
@@ -159,6 +159,7 @@ export const SceneContent: React.FC<{
 							transform: tf,
 							transformOrigin: '0 0',
 							opacity: s.opacity,
+							filter: r.el.inkShadow ? `drop-shadow(${r.el.inkShadow})` : undefined,
 						}}
 					>
 						<ElementBody r={r} s={s} ctx={ctx} t={t} />

@@ -90,7 +90,7 @@ for name, figure, width in [("robot", "Robot", 676), ("rover", "Rover", 1045)]:
         duration += (1 if mode == "trace" else 0) if name == "robot" else 3
         el, stats = compile_illustration(raster, f"/full-animation-demo/{name}.png", prefix,
                                         (960, 595), width, clock+.73, clock+duration-1.58,
-                                        mode=mode, limit=maximum)
+                                        mode=mode, limit=maximum, allow_trace=True)
         coverage.append(stats)
         if mode == "full":
             reproduce[name] = copy.deepcopy(el[0])

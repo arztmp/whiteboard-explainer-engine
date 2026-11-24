@@ -222,7 +222,7 @@ for name,source,duration,mode,width in (("trace",17,15,"trace",895),("full-one",
         add("reveal","PNG reveal · Spiral galaxy",9,[reveal],pen=.1,white=True)
     profile=analyze(FILES[source],chrome,resolution=470 if source==11 else 410,connect=True)
     el,report=compile_illustration(profile,FILES[source].name,f"ink-{name}", (960,625),width,
-                                   clock+1,clock+duration-1.8,mode=mode,limit=None)
+                                   clock+1,clock+duration-1.8,mode=mode,limit=None,allow_trace=True)
     coverage.append(report)
     add(name,{"trace":"PNG TRACE · Butterfly","full-one":"Full illustration draw · Isaac Newton",
               "full-two":"Full illustration draw II · Webb telescope"}[name],duration,el,pen=.1,white=name!="trace")
@@ -337,7 +337,7 @@ time=np.arange(round(.24*rate))/rate
 tone=(np.sin(2*math.pi*630*time)*np.clip(time*150,0,1)*np.clip((.24-time)*150,0,1)*15000).astype("<i2")
 with wave.open(str(OUT/"cue.wav"),"wb") as dest:
     dest.setparams((1,2,rate,len(tone),"NONE","not compressed"));dest.writeframes(tone.tobytes())
-metadata=dict(style="B",width=1920,height=1080,fps=30,duration=clock,theme="brand",font="sans",sceneSlideLeft=True,
+metadata=dict(allowMorph=True,style="B",width=1920,height=1080,fps=30,duration=clock,theme="brand",font="sans",sceneSlideLeft=True,
               scenes=scenes,hand=dict(original["hand"],src="/hand-motion-demo/Kalem_El.png"),
               carryHand=dict(original["carryHand"],src="/hand-motion-demo/El.png"),
               sfx=[dict(src="cue.wav",at=w["start"],volume=.7) for w in words])

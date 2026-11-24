@@ -167,8 +167,10 @@ def analyze(path, chrome, resolution=540, *, connect=False):
                 isSvg=vectors is not None, detectors=detectors, lowMetrics=low_metrics)
 
 
-def compile_illustration(analysis, src, prefix, center, width, start, end, *, mode="full", limit=46):
+def compile_illustration(analysis, src, prefix, center, width, start, end, *, mode="full", limit=46, allow_trace=False):
     """Emit native pen paths plus independently timed SVG mask regions for full mode."""
+    if mode == "trace" and not analysis["isSvg"] and not allow_trace:
+        raise ValueError("Raster TRACE is disabled unless explicitly enabled for a legacy fixture")
     if mode not in {"trace", "full"}:
         raise ValueError(f"Unsupported illustration planning mode: {mode}")
     if limit is None:

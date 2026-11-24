@@ -274,6 +274,7 @@ const carryGrip = (state: ElementState, local: Vec): Vec => {
 
 export interface CarryHandPose extends Vec {
 	closed: number;
+	scale?: number;
 	rotate: number;
 	phase: 'approach' | 'grip' | 'carry' | 'release' | 'exit';
 }
@@ -299,7 +300,7 @@ export const animateCarry = (r: Resolved, t: number, fps: number, base = compute
 
 	const grip = carryGrip(state, c.grip);
 	const pose = (phase: CarryHandPose['phase'], closed: number, rotate: number, point = grip) =>
-		({state, hand: {...point, phase, closed: drag ? 0 : closed, rotate: drag ? 0 : rotate}});
+		({state, hand: {...point, phase, scale: c.handScale, closed: drag ? 0 : closed, rotate: drag ? 0 : rotate}});
 	const mix = (from: Vec, to: Vec, p: number): Vec =>
 		({x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p)});
 	if (t < c.contact) {

@@ -12,7 +12,8 @@ const renderer = dirname(require.resolve('@remotion/renderer'));
 const {prepareServer} = require(join(renderer, 'prepare-server'));
 const {setPropsAndEnv} = require(join(renderer, 'set-props-and-env'));
 const {seekToFrame} = require(join(renderer, 'seek-to-frame'));
-const inputProps = {videoId: 'motor-demo', timelineFile: 'timeline.json'};
+const refinements = process.argv[3] === 'refinements';
+const inputProps = {videoId: 'motor-demo', timelineFile: refinements ? 'refinements.json' : 'timeline.json'};
 const out = resolve(process.argv[2] ?? 'out/motor-demo');
 const browserExecutable = process.env.CHROME_PATH;
 const timeoutInMilliseconds = 30000;
@@ -46,7 +47,6 @@ async function main() {
 			compositionWidth: composition.width, compositionHeight: composition.height,
 			compositionDurationInFrames: composition.durationInFrames, compositionFps: composition.fps,
 		}), comp, serialize(comp.props));
-		assert.equal(timeline.scenes.length, 31);
 		const seek = (frame) => seekToFrame({frame, page, composition:'C', timeoutInMilliseconds,
 			logLevel:'error', indent:false, attempt:1});
 		const at = async (frame, contact = null) => {
@@ -97,6 +97,8 @@ async function main() {
 						n.querySelector('math')?.innerHTML ?? '',n.getBoundingClientRect().width])};
 			}, tips, contact);
 		};
+		if (refinements) return await require('./verify-motor-refinements.cjs')({timeline, seek, at, page, out});
+		assert.equal(timeline.scenes.length, 31);
 		const records=['frame,time_s,scene,phase,tip_x,tip_y,target_x,target_y,error_px'];
 		const contactStats={};
 		const formulae = new Set();

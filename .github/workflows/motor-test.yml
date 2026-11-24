@@ -3,7 +3,7 @@ name: Motor acceptance test
 on:
   workflow_dispatch:
   push:
-    branches: [codex/motor-acceptance]
+    branches: [codex/motor-acceptance, codex/motor-refinements]
 
 permissions:
   contents: read
@@ -68,14 +68,27 @@ jobs:
           report = json.loads((p/"browser-verification.json").read_text())
           assert all(np.array_equal(np.asarray(a.crop(v[0])),np.asarray(b.crop(v[0]))) for v in report["pixelRects"].values())
           PY
+      - name: Verify targeted refinements in Chromium
+        if: github.ref_name == 'codex/motor-refinements'
+        run: |
+          python scripts/build-motor-refinements.py
+          cd studio
+          node scripts/verify-motor-test.cjs "$ARTIFACT_DIR" refinements
       - name: Render Motor Test in Full HD
         working-directory: studio
         run: |
-          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt"             npm run render -- C "$ARTIFACT_DIR/Motor_Test.mp4"             --props='{"videoId":"motor-demo","timelineFile":"timeline.json"}'             --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
+          timeline=timeline.json
+          if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then timeline=refinements.json; fi
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt"             npm run render -- C "$ARTIFACT_DIR/Motor_Test.mp4"             --props="{\"videoId\":\"motor-demo\",\"timelineFile\":\"$timeline\"}"             --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
       - name: Decode video and package the acceptance reports
         run: |
-          python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt"
-          cp docs/motor-acceptance.md "$ARTIFACT_DIR/status.md"
+          if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then
+            python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt" refinements
+            cp docs/motor-refinements.md "$ARTIFACT_DIR/status.md"
+          else
+            python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt"
+            cp docs/motor-acceptance.md "$ARTIFACT_DIR/status.md"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: Motor_Test

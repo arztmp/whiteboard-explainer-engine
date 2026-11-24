@@ -11,8 +11,18 @@ import numpy as np
 out = Path(sys.argv[1])
 perf_path = Path(sys.argv[2])
 asset_dir = Path(__file__).resolve().parents[1] / "studio/public/motor-demo"
-timeline = json.loads((asset_dir / "timeline.json").read_text())
+refinements = len(sys.argv) > 3 and sys.argv[3] == "refinements"
+timeline_name = "refinements.json" if refinements else "timeline.json"
+timeline = json.loads((asset_dir / timeline_name).read_text())
 manifest = json.loads((asset_dir / "report.json").read_text())
+if refinements:
+    revised = json.loads((asset_dir / "refinements-report.json").read_text())
+    manifest.update(revised)
+    manifest["coverage"] = [item for item in manifest["coverage"] if item["mode"] == "full" and
+                            any(item["source"] == e.get("src") for scene in timeline["scenes"]
+                                for e in scene["elements"])]
+    (out/"formulas.json").write_text(json.dumps(revised["formulas"], ensure_ascii=False, indent=2)+"\n")
+    shutil.copy2(asset_dir/"refinements-report.json", out/"refinements-report.json")
 video = out / "Motor_Test.mp4"
 
 
@@ -25,31 +35,45 @@ v = next(s for s in streams if s["codec_type"]=="video")
 duration = timeline["duration"]
 assert (v["width"],v["height"],v["avg_frame_rate"],int(v["nb_frames"]),float(v["duration"])) == (
     1920,1080,"30/1",duration*30,duration)
-assert any(s["codec_type"]=="audio" for s in streams)
 run("ffmpeg","-v","error","-xerror","-i",str(video),"-f","null","-")
 
-decoded = run("ffmpeg","-v","error","-i",str(video),"-vn","-f","f32le","-ar","16000","-ac","1","-")
-pcm = np.frombuffer(decoded,dtype="<f4")
-n = 80
-loud = np.max(np.abs(pcm[:len(pcm)//n*n].reshape(-1,n)),axis=1)>.023
-onsets = np.flatnonzero(loud & ~np.r_[False,loud[:-1]])*n/16000
-assert len(onsets)==len(manifest["cues"]),onsets
 timing = []
-for word, signal in zip(manifest["cues"],onsets):
-    frame = math.ceil(word["start"]*30-1e-8)
-    delta = (signal-frame/30)*1000
-    assert abs(delta)<1000/30
-    timing.append(dict(cue=word["text"],expectedVisualFrame=frame,measuredAudioSeconds=signal,deltaMs=round(delta,3)))
-(out/"audio.json").write_text(json.dumps({"type":"synthetic","narration":"NOT TESTED","cues":timing},indent=2)+"\n")
+if not refinements:
+    assert any(s["codec_type"] == "audio" for s in streams)
+    decoded = run("ffmpeg","-v","error","-i",str(video),"-vn","-f","f32le","-ar","16000","-ac","1","-")
+    pcm = np.frombuffer(decoded,dtype="<f4")
+    n = 80
+    loud = np.max(np.abs(pcm[:len(pcm)//n*n].reshape(-1,n)),axis=1)>.023
+    onsets = np.flatnonzero(loud & ~np.r_[False,loud[:-1]])*n/16000
+    assert len(onsets)==len(manifest["cues"]),onsets
+    for word, signal in zip(manifest["cues"],onsets):
+        frame = math.ceil(word["start"]*30-1e-8)
+        delta = (signal-frame/30)*1000
+        assert abs(delta)<1000/30
+        timing.append(dict(cue=word["text"],expectedVisualFrame=frame,measuredAudioSeconds=signal,deltaMs=round(delta,3)))
+    (out/"audio.json").write_text(json.dumps({"type":"synthetic","narration":"NOT TESTED","cues":timing},indent=2)+"\n")
 
 samples={}
 for i,scene in enumerate(manifest["scenes"],1):
     start,end=scene["start"],scene["end"]
     points=(.08,.23,.48,.76,.88) if scene["id"] in {"background","handwriting","layers","bg-two","reassemble",
         "full-one","full-two","morph","zoom","scatter","explainer"} else (.23,.58,.81)
+    if refinements:
+        if scene["id"] == "zoom-refined":
+            points = tuple(t/(end-start) for t in (.4,2.7,5,7.4,11))
+        elif scene["id"].startswith("background"):
+            points = tuple(t/(end-start) for t in (1.7,3,4.5,5.4,end-start-1.1))
+        else:
+            points = (.12,.35,.60,.80,.94)
     for j,p in enumerate(points,1):
         samples[round((start+p*(end-start))*30)] = f'{i:02}-{scene["id"]}-{j}'
 samples=dict(sorted(samples.items()))
+if refinements:
+    for formula in manifest["formulas"]:
+        start, end = formula["start"], formula["end"]
+        samples[round((start+(end-start)*.52)*30)] = f'{formula["id"]}-inking'
+        samples[round((end+.14)*30)] = f'{formula["id"]}-complete'
+    samples = dict(sorted(samples.items()))
 folder=out/"frames"
 folder.mkdir(exist_ok=True)
 def select_frames(frames):
@@ -76,5 +100,5 @@ media=dict(durationSeconds=duration,frames=duration*30,width=1920,height=1080,fp
 (out/"assets.json").write_text(json.dumps(manifest["assets"],indent=2)+"\n")
 (out/"trace.json").write_text(json.dumps(manifest["coverage"],indent=2)+"\n")
 (out/"scenes.json").write_text(json.dumps(manifest["scenes"],indent=2)+"\n")
-shutil.copy2(asset_dir/"timeline.json",out/"timeline.json")
+shutil.copy2(asset_dir/timeline_name,out/"timeline.json")
 print(json.dumps({"performance":media,"audio":timing}))

@@ -66,6 +66,8 @@ export interface TransitionIn {
 
 export interface Carry {
 	mode?: 'carry' | 'drag';
+	/** Per-carry override for a calibrated background hand. */
+	handScale?: number;
 	after?: Move[];
 	/** Scene-local positions. The target is the element anchor, grip is relative to that anchor. */
 	grip: Vec;
@@ -86,6 +88,8 @@ export type FadeCurve = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 
 interface BaseElement {
 	screenFixed?: boolean;
+	/** Optional CSS drop-shadow for legibility over a picture. */
+	inkShadow?: string;
 	id: string;
 	x?: number;
 	y?: number;
@@ -384,6 +388,8 @@ export interface HandConfig {
 }
 
 export interface Timeline {
+	/** Retained for legacy acceptance scenes only. */
+	allowMorph?: boolean;
 	style: Style;
 	fps: number;
 	width: number;
