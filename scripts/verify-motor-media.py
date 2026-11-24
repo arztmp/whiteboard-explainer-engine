@@ -52,7 +52,15 @@ for i,scene in enumerate(manifest["scenes"],1):
 samples=dict(sorted(samples.items()))
 folder=out/"frames"
 folder.mkdir(exist_ok=True)
-select="select='"+"+".join(f"eq(n,{f})" for f in samples)+"',scale=720:404"
+def select_frames(frames):
+    # FFmpeg limits expression depth, so keep the two branches balanced.
+    if len(frames) == 1:
+        return f"eq(n,{frames[0]})"
+    middle = len(frames) // 2
+    return f"({select_frames(frames[:middle])}+{select_frames(frames[middle:])})"
+
+
+select=f"select='{select_frames(list(samples))}',scale=720:404"
 run("ffmpeg","-v","error","-i",str(video),"-vf",select,"-fps_mode","vfr","-threads","1","-q:v","3",str(folder/"%03d.jpg"))
 for j,name in enumerate(samples.values(),1):
     (folder/f"{j:03}.jpg").replace(folder/f"{name}.jpg")
