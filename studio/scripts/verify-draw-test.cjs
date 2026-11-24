@@ -81,18 +81,24 @@ module.exports = async ({timeline, seek, page, out}) => {
 			document.querySelector('[data-scene]').style.background = '#83d1b9';
 		});
 		await capture(scene.id+'-painted');
-		await page.evaluate(async () => {
+		const alphaDifferentPixels = await page.evaluate(async () => {
 			const canvas = document.querySelector('[data-painted-source]');
 			const image = new Image();
 			image.src = canvas.dataset.paintedSource;
 			await image.decode();
 			const ctx = canvas.getContext('2d');
+			const actual = ctx.getImageData(0,0,canvas.width,canvas.height).data;
 			ctx.clearRect(0,0,canvas.width,canvas.height);
 			ctx.drawImage(image,0,0,canvas.width,canvas.height);
+			const expected = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+			let different = 0;
+			for (let i = 3; i < actual.length; i += 4) if (actual[i] !== expected[i]) different++;
+			return different;
 		});
+		assert.equal(alphaDifferentPixels,0, `${scene.id} alpha differs from source`);
 		await capture(scene.id+'-original');
 		// Rebuild DOM for the next scene; browser QA always seeks the same timeline.
-		reports.push({id:scene.id, phases, pathSamples:paths.length, gapSamples, maximumErrorPx});
+		reports.push({id:scene.id, phases, pathSamples:paths.length, gapSamples, maximumErrorPx, alphaDifferentPixels});
 	}
 	await writeFile(join(out,'contact.csv'),csv.join('\n')+'\n');
 	await writeFile(join(out,'browser.json'),JSON.stringify({scenes:reports,probes},null,2)+'\n');

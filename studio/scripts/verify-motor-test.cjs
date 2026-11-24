@@ -33,7 +33,7 @@ async function main() {
 			sampleRate: 48000, logLevel: 'error', indent: false});
 		browser = await openBrowser('chrome', {browserExecutable, logLevel: 'error'});
 		const comp = await selectComposition({id: 'C', serveUrl: server.serveUrl, inputProps, puppeteerInstance: browser});
-		assert.deepEqual([comp.width, comp.height, comp.fps, comp.durationInFrames], [1920, 1080, 30, comp.props.timeline.duration * 30]);
+		assert.deepEqual([comp.width, comp.height, comp.fps, comp.durationInFrames], [1920, 1080, 30, Math.round(comp.props.timeline.duration * 30)]);
 		const timeline = comp.props.timeline;
 		const tips = {pen: timeline.hand.tip, finger: timeline.carryHand?.tip};
 		const page = await browser.newPage({context: () => null, logLevel: 'error', indent: false,
