@@ -13,6 +13,11 @@ def _shift(stroke, dx, dy):
                    end=(stroke.end[0]+dx, stroke.end[1]+dy))
 
 
+def _vertical_points(strokes):
+    return [float(y) for stroke in strokes for _, y in
+            re.findall(r"(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)", stroke.d)]
+
+
 def formula_strokes(expr, x, baseline, size, *, color, width=4.5):
     def box(value, s):
         if isinstance(value, str):
@@ -35,15 +40,18 @@ def formula_strokes(expr, x, baseline, size, *, color, width=4.5):
             num, nw = box(args[0], .82*s)
             denom, dw = box(args[1], .82*s)
             length = max(nw, dw) + .32*s
-            return ([_shift(p, (length-nw)/2, -.62*s) for p in num]
-                    + [polyline([(0, -.4*s), (length, -.4*s)], width, color=color)]
-                    + [_shift(p, (length-dw)/2, .47*s) for p in denom]), length
+            bar = -.4*s
+            clearance = max(.12*s, 2*width)
+            num_y = min(-.62*s, bar-clearance-max(_vertical_points(num), default=0))
+            denom_y = max(.47*s, bar+clearance-min(_vertical_points(denom), default=0))
+            return ([_shift(p, (length-nw)/2, num_y) for p in num]
+                    + [polyline([(0, bar), (length, bar)], width, color=color)]
+                    + [_shift(p, (length-dw)/2, denom_y) for p in denom]), length
         if kind == "root":
             body, bw = box(args[0], s)
             left = .37*s
             # Clear the authored exponent strokes as well as the main radicand.
-            roof = min(-.97*s, min((float(y) for p in body for _, y in
-                                    re.findall(r"(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)", p.d)), default=0) - .11*s)
+            roof = min(-.97*s, min(_vertical_points(body), default=0) - .11*s)
             length = bw + left + .12*s
             radical = polyline([(0, -.31*s), (.095*s, -.38*s), (.20*s, .03*s),
                                 (left, roof), (length, roof)], width, color=color)

@@ -18,6 +18,9 @@ manifest = json.loads((asset_dir / "report.json").read_text())
 if refinements:
     revised = json.loads((asset_dir / "refinements-report.json").read_text())
     manifest.update(revised)
+    for asset in manifest["assets"]:
+        asset["usage"] = [scene["id"] for scene in timeline["scenes"]
+                          if any(e.get("src") == asset["file"] for e in scene["elements"])]
     manifest["coverage"] = [item for item in manifest["coverage"] if item["mode"] == "full" and
                             any(item["source"] == e.get("src") for scene in timeline["scenes"]
                                 for e in scene["elements"])]
@@ -95,7 +98,9 @@ media=dict(durationSeconds=duration,frames=duration*30,width=1920,height=1080,fp
            uploadedSourceFiles=len(manifest["assets"]),uniqueUploadedSources=len({a["sha256"] for a in manifest["assets"]}),
            animationElementCount=sum(e["enter"]!="none" or any(e.get(k) for k in ("moves","carry","scatter","zoom","exit","illustration"))
                                      for sc in timeline["scenes"] for e in sc["elements"]),
-           samples=len(samples),decodeErrors=0,est25MinSeconds=round(float(elapsed)*1500/duration,1))
+           samples=len(samples),decodeErrors=0)
+if not refinements:
+    media["est25MinSeconds"] = round(float(elapsed)*1500/duration,1)
 (out/"performance.json").write_text(json.dumps(media,indent=2)+"\n")
 (out/"assets.json").write_text(json.dumps(manifest["assets"],indent=2)+"\n")
 (out/"trace.json").write_text(json.dumps(manifest["coverage"],indent=2)+"\n")
