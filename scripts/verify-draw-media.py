@@ -24,6 +24,10 @@ def pixels(name):
 
 
 for scene, result in zip(scenes, browser["scenes"], strict=True):
+    if "previousStrokeCount" in scene:
+        assert result["pathSamples"] == scene["strokeCount"]
+        assert scene["previousStrokeCount"] - scene["strokeCount"] == scene["removedStrokeCount"]
+        assert result["contactsWithoutChange"] == scene["contactsWithoutChangeAfter"] == 0
     delta = np.abs(pixels(scene["id"]+"-painted")-pixels(scene["id"]+"-original")).max(axis=2)
     result["finalDifferentPixels"] = int(np.count_nonzero(delta))
     result["finalMaxChannelDifference"] = int(delta.max())

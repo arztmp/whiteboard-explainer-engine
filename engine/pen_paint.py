@@ -1,4 +1,6 @@
 """Plan image contact paths before rendering. All widths are in scene pixels."""
+import json
+import subprocess
 from math import ceil, dist
 from pathlib import Path
 
@@ -203,8 +205,7 @@ def compile_paint(source: Path, src, mode, center, width, start, chrome, *, pref
     if mode != "reveal":
         groups, coverage = _ink_routes(analyze(source, chrome, resolution=resolution, connect=True),
                                        strength, ratio, mode == "full")
-    color_count = len(color)
-    paths = []
+    candidates = []
     previous = (image.height*.92, image.width*.85)
     clock = start
     image_id = f"{prefix}-art"
@@ -213,20 +214,39 @@ def compile_paint(source: Path, src, mode, center, width, start, chrome, *, pref
             coords = [(round(center[0]-width/2+(x+.5)*ratio, 3),
                        round(center[1]-height/2+(y+.5)*height/image.height, 3)) for y,x in points]
             ink = polyline(coords, 2*radius*(ratio if phase == "color" else 1), color=THEME["navy"])
-            if ink.length <= .01:
-                continue
-            clock += max(.107, dist(previous, points[0])*ratio/1050)
-            # easeDraw slightly accelerates/decelerates each stroke. Schedule
-            # sufficient time for moderate peak speeds even on complex assets.
-            duration = max(.14, ink.length/(575 if phase == "color" else 515))
-            paths.append(dict(id=f"{prefix}-paint-{len(paths):03d}", type="path", d=ink.d, stroke=ink.color,
-                              strokeWidth=ink.width, rough=False, hand=True, enter="draw",
-                              enterAt=round(clock, 6), enterDuration=round(duration, 6),
-                              paintFor=dict(imageId=image_id, phase=phase)))
-            clock += duration
-            previous = points[-1]
+            if ink.length > .01:
+                candidates.append(dict(d=ink.d, width=ink.width, stroke=ink.color, phase=phase,
+                                       length=ink.length, points=coords))
+                previous = points[-1]
+    analyzer = Path(__file__).resolve().parents[1]/"studio/scripts/prune-paint.cjs"
+    job = dict(source=str(source.resolve()), area=dict(x=center[0]-width/2, y=center[1]-height/2,
+               width=width,height=height), paths=candidates)
+    probe = subprocess.run(["node",str(analyzer),chrome], input=json.dumps(job), text=True,
+                           check=True, capture_output=True, timeout=160)
+    audit = json.loads(probe.stdout)
+    paths = []
+    previous = (center[0]+width*.35, center[1]+height*.42)
+    for item in audit["kept"]:
+        candidate = candidates[item["index"]]
+        points = item["points"]
+        phase = candidate["phase"]
+        clock += max(.107, dist(previous,points[0])/1050)
+        duration = max(.14, item["length"]/(575 if phase == "color" else 515))
+        paths.append(dict(id=f"{prefix}-paint-{len(paths):03d}", type="path", d=item["d"],
+                          stroke=candidate["stroke"], strokeWidth=item["width"], rough=False,
+                          hand=True, enter="draw", enterAt=round(clock,6), enterDuration=round(duration,6),
+                          paintFor=dict(imageId=image_id, phase=phase)))
+        clock += duration
+        previous = points[-1]
     image_element = dict(id=image_id,type="image",src=src,x=center[0],y=center[1],w=width,h=height,
                          enter="none",penPaint=True)
     report = dict(mode=mode, source=src, analysisSize=image.size, edgeCoverage=coverage,
-                  colorRoutes=color_count, strokeCount=len(paths), requiredSeconds=round(clock-start, 3))
+                  colorRoutes=sum(p["paintFor"]["phase"] == "color" for p in paths),
+                  strokeCount=len(paths), requiredSeconds=round(clock-start, 3),
+                  previousStrokeCount=len(candidates), removedStrokeCount=len(audit["removed"]),
+                  contactsWithoutChangeBefore=sum(not p["changed"] for p in audit["baseline"]),
+                  contactsWithoutChangeAfter=sum(not p["changed"] for p in audit["optimized"]),
+                  contactsBelowVisibilityBefore=sum(not p["visible"] for p in audit["baseline"]),
+                  contactsBelowVisibilityAfter=sum(not p["visible"] for p in audit["optimized"]),
+                  contactAudit={k:v for k,v in audit.items() if k != "kept"})
     return [image_element, *paths], clock, report

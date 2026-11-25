@@ -3,7 +3,7 @@ name: Motor acceptance test
 on:
   workflow_dispatch:
   push:
-    branches: [codex/motor-acceptance, codex/motor-refinements, codex/draw-effects]
+    branches: [codex/motor-acceptance, codex/motor-refinements, codex/draw-effects, codex/draw-contact-cleanup]
 
 permissions:
   contents: read
@@ -71,19 +71,19 @@ jobs:
           assert all(np.array_equal(np.asarray(a.crop(v[0])),np.asarray(b.crop(v[0]))) for v in report["pixelRects"].values())
           PY
       - name: Verify targeted refinements in Chromium
-        if: github.ref_name == 'codex/motor-refinements' || github.ref_name == 'codex/draw-effects'
+        if: github.ref_name == 'codex/motor-refinements' || (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
         run: |
           python scripts/build-motor-refinements.py
           cd studio
           node scripts/verify-motor-test.cjs "$ARTIFACT_DIR" refinements
       - name: Verify drawing paths and source pixels
-        if: github.ref_name == 'codex/draw-effects'
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
         run: |
           python scripts/build-draw-test.py
           (cd studio && node scripts/verify-motor-test.cjs "$ARTIFACT_DIR" draw)
           python scripts/verify-draw-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt" pixels
       - name: Render drawing acceptance in Full HD
-        if: github.ref_name == 'codex/draw-effects'
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
         working-directory: studio
         run: |
           /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt" \
@@ -91,21 +91,25 @@ jobs:
             --props='{"videoId":"motor-demo","timelineFile":"draw-test.json"}' \
             --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
       - name: Package drawing acceptance
-        if: github.ref_name == 'codex/draw-effects'
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
         run: |
           python scripts/verify-draw-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt"
           git diff --name-only origin/codex/motor-refinements...HEAD > "$ARTIFACT_DIR/changed-files.txt"
+          if [[ "$GITHUB_REF_NAME" == codex/draw-contact-cleanup ]]; then
+            git diff --name-only origin/codex/draw-effects...HEAD > "$ARTIFACT_DIR/changed-files.txt"
+          fi
           cp docs/draw-effects.md "$ARTIFACT_DIR/status.md"
+          printf '%s\n' 'PASS: Python tests, TypeScript, previous motor acceptance, hand motion, effects, professional drawing, PNG/SVG pixel comparison, and targeted refinements.' > "$ARTIFACT_DIR/regression-status.txt"
           find "$ARTIFACT_DIR/regression" -type f -printf '%P\n' | sort > "$ARTIFACT_DIR/regression-files.txt"
       - name: Render Motor Test in Full HD
-        if: github.ref_name != 'codex/draw-effects'
+        if: github.ref_name != 'codex/draw-effects' && github.ref_name != 'codex/draw-contact-cleanup'
         working-directory: studio
         run: |
           timeline=timeline.json
           if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then timeline=refinements.json; fi
           /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt"             npm run render -- C "$ARTIFACT_DIR/Motor_Test.mp4"             --props="{\"videoId\":\"motor-demo\",\"timelineFile\":\"$timeline\"}"             --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
       - name: Decode video and package the acceptance reports
-        if: github.ref_name != 'codex/draw-effects'
+        if: github.ref_name != 'codex/draw-effects' && github.ref_name != 'codex/draw-contact-cleanup'
         run: |
           if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then
             python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt" refinements
@@ -116,7 +120,7 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.ref_name == 'codex/draw-effects' && 'Draw_Test' || 'Motor_Test' }}
+          name: ${{ (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup') && 'Draw_Test' || 'Motor_Test' }}
           path: ${{ runner.temp }}/Motor_Test
           if-no-files-found: error
           compression-level: 0

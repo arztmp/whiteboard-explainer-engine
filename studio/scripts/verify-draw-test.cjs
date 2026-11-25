@@ -37,7 +37,32 @@ module.exports = async ({timeline, seek, page, out}) => {
 			});
 			return {x,y,routeX:p.x, routeY:p.y,length,swept, radius:Number(route.getAttribute('stroke-width'))/2};
 		}, {id, tip:timeline.hand.tip, from});
+		let contactsWithoutChange = 0;
+		let contactsBelowVisibility = 0;
+		const contributions = [];
+		const inkSnapshot = () => page.evaluate(() => {
+			const canvas = document.querySelector('[data-painted-source]');
+			const live = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+			window.__paintBefore = live;
+		});
+		const inkDiff = () => page.evaluate(() => {
+			const canvas = document.querySelector('[data-painted-source]');
+			const live = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+			const before = window.__paintBefore;
+			let changed=0, visible=0;
+			for(let p=0;p<live.length;p+=4){
+				if(before[p]===live[p] && before[p+1]===live[p+1] && before[p+2]===live[p+2] && before[p+3]===live[p+3]) continue;
+				changed++;
+				for (let c=0;c<3;c++) if(Math.abs((255-before[p+c])*before[p+3]-(255-live[p+c])*live[p+3])>8*255) {
+					visible++;
+					break;
+				}
+			}
+			return {changed,visible};
+		});
 		for (const stroke of paths) {
+			await seek(Math.ceil(stroke.enterAt*30)-1);
+			await inkSnapshot();
 			const frame = Math.round((stroke.enterAt+stroke.enterDuration*.5)*30);
 			await seek(frame);
 			const row = await inspect(stroke.id);
@@ -46,6 +71,11 @@ module.exports = async ({timeline, seek, page, out}) => {
 			assert(d<.1, `${scene.id}/${stroke.id} pen distance ${d}`);
 			maximumErrorPx = Math.max(d,maximumErrorPx);
 			csv.push([scene.id,stroke.id,stroke.paintFor.phase,frame,row.x,row.y,row.routeX,row.routeY,d].join(','));
+			await seek(Math.ceil((stroke.enterAt+stroke.enterDuration)*30));
+			const contribution=await inkDiff();
+			if(!contribution.changed) contactsWithoutChange++;
+			if(!contribution.visible) contactsBelowVisibility++;
+			contributions.push({id:stroke.id,...contribution});
 		}
 		const color = paths.filter(e=>e.paintFor.phase==='color');
 		assert(color.length>3);
@@ -98,7 +128,7 @@ module.exports = async ({timeline, seek, page, out}) => {
 		assert.equal(alphaDifferentPixels,0, `${scene.id} alpha differs from source`);
 		await capture(scene.id+'-original');
 		// Rebuild DOM for the next scene; browser QA always seeks the same timeline.
-		reports.push({id:scene.id, phases, pathSamples:paths.length, gapSamples, maximumErrorPx, alphaDifferentPixels});
+		reports.push({id:scene.id, phases, pathSamples:paths.length, gapSamples, maximumErrorPx, alphaDifferentPixels, contactsWithoutChange, contactsBelowVisibility, contributions});
 	}
 	await writeFile(join(out,'contact.csv'),csv.join('\n')+'\n');
 	await writeFile(join(out,'browser.json'),JSON.stringify({scenes:reports,probes},null,2)+'\n');
