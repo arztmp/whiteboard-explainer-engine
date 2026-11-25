@@ -1,10 +1,11 @@
 // Trạng thái animation của 1 element tại thời điểm t (giây tuyệt đối). Hàm thuần.
 import {spring} from 'remotion';
-import type {Vec} from '../types';
+import type {FadeCurve, Move, PenTravel, Vec} from '../types';
 import {clamp, easeDraw, easeIn, easeInOut, easeOut, lerp, progress} from './math';
 import type {Resolved} from './resolve';
 
 export interface ElementState {
+	z: number;
 	visible: boolean;
 	/** điểm neo sau moves (toạ độ scene) */
 	x: number;
@@ -25,10 +26,43 @@ const SLIDE = 60;
 // Spring êm: overshoot rất nhỏ (<4% trên khoảng 0.85→1)
 const POP_SPRING = {damping: 18, stiffness: 180, mass: 1};
 
+const fadeAt = (p: number, curve?: FadeCurve) => {
+	switch (curve) {
+		case 'linear': return p;
+		case 'ease-in': return easeIn(p);
+		case 'ease-out': return easeOut(p);
+		default: return easeInOut(p);
+	}
+};
+
+const applyMoves = (state: ElementState, moves: Move[] | undefined, t: number, offset?: Vec) => {
+	if (!moves?.length) return;
+	for (const move of [...moves].sort((a, b) => a.at - b.at)) {
+		if (t < move.at) break;
+		const p = easeInOut(progress(t, move.at, move.duration ?? .6));
+		const targetX = move.x === undefined ? state.x : move.x + (offset?.x ?? 0);
+		const targetY = move.y === undefined ? state.y : move.y + (offset?.y ?? 0);
+		if (move.via) {
+			const vx = move.via.x + (offset?.x ?? 0);
+			const vy = move.via.y + (offset?.y ?? 0);
+			state.x = lerp(lerp(state.x, vx, p), lerp(vx, targetX, p), p);
+			state.y = lerp(lerp(state.y, vy, p), lerp(vy, targetY, p), p);
+		} else {
+			state.x = lerp(state.x, targetX, p);
+			state.y = lerp(state.y, targetY, p);
+		}
+		if (move.scale !== undefined) state.scale = lerp(state.scale, move.scale, p);
+		if (move.rotate !== undefined) state.rotate = lerp(state.rotate, move.rotate, p);
+		if (move.opacity !== undefined) state.opacity = lerp(state.opacity, move.opacity, p);
+		if (move.z !== undefined) state.z = move.z;
+	}
+};
+
 export const computeState = (r: Resolved, t: number, fps: number): ElementState => {
 	const {el, geom} = r;
 	const s: ElementState = {
 		visible: true,
+		z: el.z ?? (el.type === 'image' && el.role === 'background' ? -1000 : 0),
 		x: geom.anchor.x,
 		y: geom.anchor.y,
 		dx: 0,
@@ -41,21 +75,7 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		grayscale: 0,
 	};
 
-	// --- moves (tích luỹ, easeInOut) ---
-	if (el.moves && el.moves.length) {
-		const ms = [...el.moves].sort((a, b) => a.at - b.at);
-		const isPath = el.type === 'path';
-		for (const m of ms) {
-			if (t < m.at) break;
-			const p = easeInOut(progress(t, m.at, m.duration ?? 0.6));
-			// path: x/y của move là độ lệch so với vị trí gốc
-			if (m.x !== undefined) s.x = lerp(s.x, isPath ? geom.anchor.x + m.x : m.x, p);
-			if (m.y !== undefined) s.y = lerp(s.y, isPath ? geom.anchor.y + m.y : m.y, p);
-			if (m.scale !== undefined) s.scale = lerp(s.scale, m.scale, p);
-			if (m.rotate !== undefined) s.rotate = lerp(s.rotate, m.rotate, p);
-			if (m.opacity !== undefined) s.opacity = lerp(s.opacity, m.opacity, p);
-		}
-	}
+	applyMoves(s, el.moves, t, el.type === 'path' ? geom.anchor : undefined);
 
 	// --- enter ---
 	if (t < r.enterAt) {
@@ -82,6 +102,15 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 				s.opacity *= easeOut(clamp(p / 0.6, 0, 1));
 				break;
 			}
+			case 'slide': {
+				const offset = el.enterOffset ?? {x: -SLIDE, y: 0};
+				s.dx += offset.x * (1 - easeOut(p));
+				s.dy += offset.y * (1 - easeOut(p));
+				break;
+			}
+			case 'rotate':
+				s.rotate += (el.enterAngle ?? -180) * (1 - easeInOut(p));
+				break;
 			case 'slide-up':
 				s.dy += SLIDE * (1 - easeOut(p));
 				s.opacity *= easeOut(clamp(p / 0.7, 0, 1));
@@ -95,11 +124,19 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 				s.opacity *= easeOut(clamp(p / 0.7, 0, 1));
 				break;
 			case 'fade':
-				s.opacity *= easeInOut(p);
+				s.opacity *= fadeAt(p, el.enterCurve);
 				break;
 			case 'grow':
 				// bar tự mọc chiều cao; các loại khác phóng to từ 0
-				if (el.type !== 'bar') s.scale *= easeOut(p);
+				if (el.type !== 'bar') {
+					const f = lerp(el.enterScale ?? 0, 1, easeOut(p));
+					if (el.growOrigin) {
+						const pivot = toScene(s, el.growOrigin);
+						s.dx += (pivot.x - s.x - s.dx) * (1 - f);
+						s.dy += (pivot.y - s.y - s.dy) * (1 - f);
+					}
+					s.scale *= f;
+				}
 				s.opacity *= clamp(p * 3, 0, 1);
 				break;
 			case 'draw':
@@ -126,7 +163,7 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		}
 		switch (r.exit) {
 			case 'fade':
-				s.opacity *= 1 - easeInOut(q);
+				s.opacity *= 1 - fadeAt(q, el.exitCurve);
 				break;
 			case 'slide-down':
 				s.dy += SLIDE * easeIn(q);
@@ -147,6 +184,19 @@ export const computeState = (r: Resolved, t: number, fps: number): ElementState 
 		if (el.idle.scaleAmp) s.scale *= 1 + Math.sin(w + Math.PI / 2) * el.idle.scaleAmp;
 	}
 
+	if (el.zoom) {
+		const {at, in: zoomIn, hold = 0, out, scale, origin = {x: 0, y: 0}} = el.zoom;
+		const amount = easeInOut(progress(t, at, zoomIn)) * (1 - easeInOut(progress(t, at + zoomIn + hold, out)));
+		const factor = lerp(1, scale, amount);
+		const pivot = toScene(s, origin);
+		s.dx += (pivot.x - s.x - s.dx) * (1 - factor);
+		s.dy += (pivot.y - s.y - s.dy) * (1 - factor);
+		s.scale *= factor;
+	}
+
+	if (el.type === 'path' && el.inkFade)
+		s.opacity *= 1 - easeInOut(progress(t, el.inkFade.at, el.inkFade.end - el.inkFade.at));
+
 	if (s.opacity <= 0.001) s.visible = false;
 	return s;
 };
@@ -163,6 +213,7 @@ export const toScene = (s: ElementState, local: Vec): Vec => {
 };
 
 export interface HandPose {
+	lift?: number;
 	x: number;
 	y: number;
 	opacity: number;
@@ -207,4 +258,115 @@ export const pickHand = (poses: HandPose[]): HandPose | null => {
 	const active = poses.filter((p) => p.active);
 	const pool = active.length ? active : poses;
 	return pool.reduce((a, b) => (b.startedAt > a.startedAt ? b : a));
+};
+
+const carryGrip = (state: ElementState, local: Vec): Vec => {
+	// Match the precision and order of the element's CSS transform, including a card flip.
+	const a = Number(state.rotateY.toFixed(2)) * Math.PI / 180;
+	const perspective = 1400 / (1400 + local.x * Math.sin(a));
+	return toScene({
+		...state,
+		dx: Number(state.dx.toFixed(2)),
+		dy: Number(state.dy.toFixed(2)),
+		scale: Number(state.scale.toFixed(4)),
+	}, {x: local.x * Math.cos(a) * perspective, y: local.y * perspective});
+};
+
+export interface CarryHandPose extends Vec {
+	closed: number;
+	scale?: number;
+	rotate: number;
+	phase: 'approach' | 'grip' | 'carry' | 'release' | 'exit';
+}
+
+/** The element and its bearing hand are sampled together, with no state from previous frames. */
+export const animateCarry = (r: Resolved, t: number, fps: number, base = computeState(r, t, fps)):
+	{state: ElementState; hand: CarryHandPose | null} => {
+	const c = r.el.carry;
+	if (!c || t < c.start) return {state: base, hand: null};
+	const between = (a: number, b: number) => easeInOut(progress(t, a, b - a));
+	const state = {...base};
+	const drag = c.mode === 'drag';
+	if (t >= c.pickup) {
+		const start = computeState(r, c.pickup, fps);
+		const p = between(c.pickup, c.land);
+		state.x = lerp(start.x + Number(start.dx.toFixed(2)), c.target.x, p);
+		state.y = lerp(start.y + Number(start.dy.toFixed(2)), c.target.y, p) - (drag ? 0 : (c.lift ?? 95)) * 4 * p * (1 - p);
+		state.dx = 0;
+		state.dy = 0;
+	}
+	if (t >= c.release) applyMoves(state, c.after, t);
+	if (t >= c.end || (t < c.release && !state.visible)) return {state, hand: null};
+
+	const grip = carryGrip(state, c.grip);
+	const pose = (phase: CarryHandPose['phase'], closed: number, rotate: number, point = grip) =>
+		({state, hand: {...point, phase, scale: c.handScale, closed: drag ? 0 : closed, rotate: drag ? 0 : rotate}});
+	const mix = (from: Vec, to: Vec, p: number): Vec =>
+		({x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p)});
+	if (t < c.contact) {
+		const p = between(c.start, c.contact);
+		return pose('approach', 0, lerp(-12, -3, p), mix(c.from, grip, p));
+	}
+	if (t < c.pickup) {
+		const p = between(c.contact, c.pickup);
+		return pose('grip', p, lerp(-3, 0, p));
+	}
+	if (t < c.land) {
+		const p = between(c.pickup, c.land);
+		return pose('carry', 1, -8 * Math.sin(Math.PI * p));
+	}
+	if (t < c.release) {
+		const p = between(c.land, c.release);
+		return pose('release', 1 - p, 4 * p);
+	}
+	const p = between(c.release, c.end);
+	const atRelease = {...computeState(r, c.release, fps), ...c.target, dx: 0, dy: 0};
+	return pose('exit', 0, lerp(4, 18, p), mix(carryGrip(atRelease, c.grip), c.to, p));
+};
+
+type AnimatedItem = {r: Resolved; state: ElementState; hand: CarryHandPose | null};
+
+const travelPen = (items: AnimatedItem[], travel: PenTravel, t: number, fps: number): HandPose | null => {
+	if (t < travel.start || t >= travel.end) return null;
+	const strokes = items.filter(({r}) => r.el.hand === true && r.enter === 'draw' && (r.el.type === 'path' || (r.el.type === 'image' && r.el.reveal)))
+		.sort((a, b) => a.r.enterAt - b.r.enterAt);
+	if (!strokes.length) return null;
+
+	const tipAt = ({r, state}: AnimatedItem, p: number, at: number): Vec => {
+		const path = r.geom.path;
+		const tip = path?.exactPointAt(path.length * p);
+		const local = path && tip
+			? {x: tip.x - path.bbox.x - path.bbox.w / 2, y: tip.y - path.bbox.y - path.bbox.h / 2}
+			: r.geom.tipAt(p);
+		return carryGrip(at === t ? state : computeState(r, at, fps), local);
+	};
+
+	let previous = travel.from;
+	let previousEnd = travel.start;
+	const moveTo = (next: Vec, at: number): HandPose => {
+		const p = easeInOut(progress(t, previousEnd, at - previousEnd));
+		return {x: lerp(previous.x, next.x, p), y: lerp(previous.y, next.y, p),
+			opacity: 1, active: false, startedAt: travel.start,
+			lift: travel.lift ? Math.sin(Math.PI * p) : undefined};
+	};
+	for (const stroke of strokes) {
+		const start = stroke.r.enterAt;
+		const end = start + stroke.r.enterDur;
+		if (t < start) return moveTo(tipAt(stroke, 0, start), start);
+		if (t <= end) return {...tipAt(stroke, stroke.state.draw ?? 1, t), opacity: 1, active: true, startedAt: start};
+		previous = tipAt(stroke, 1, end);
+		previousEnd = end;
+	}
+	return moveTo(travel.to, travel.end);
+};
+
+/** One frame sample drives the drawing, any attached object, and the scene's only hand. */
+export const sampleSceneAnimation = (resolved: Resolved[], t: number, fps: number, penTravel?: PenTravel) => {
+	const items = resolved.map((r, i) => ({r, i, ...animateCarry(r, t, fps)}))
+		.sort((a, b) => a.state.z - b.state.z || a.i - b.i);
+	const carry = items.find((item) => item.hand)?.hand;
+	if (carry) return {items, hand: {kind: 'carry' as const, pose: carry}};
+	const pose = penTravel ? travelPen(items, penTravel, t, fps)
+		: pickHand(items.map(({r, state}) => handPose(r, state, t)).filter((p): p is HandPose => p !== null));
+	return {items, hand: {kind: 'draw' as const, pose}};
 };

@@ -1,6 +1,7 @@
+import brand from '../theme.json';
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Img} from 'remotion';
-import {computeState, toScene} from '../lib/anim';
+import {animateCarry, toScene} from '../lib/anim';
 import {camTransform, cameraAt, DEFAULT_CAM, lerpCam, type Cam} from '../lib/camera';
 import {clamp, easeInOut, easeOut, progress, seededRandom} from '../lib/math';
 import {resolveElement, type Ctx} from '../lib/resolve';
@@ -34,12 +35,15 @@ const SceneLayer: React.FC<{
 	ctx: Ctx;
 	t: number;
 	fontsOk: boolean;
+	hideHands: boolean;
 	wrapper: React.CSSProperties;
 	cam: Cam;
-}> = ({scene, tl, ctx, t, fontsOk, wrapper, cam}) => {
+}> = ({scene, tl, ctx, t, fontsOk, wrapper, cam, hideHands}) => {
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
+	const overlay = resolved.filter((item) => item.el.screenFixed);
+	const artwork = overlay.length ? resolved.filter((item) => !item.el.screenFixed) : resolved;
 	return (
-		<AbsoluteFill style={{background: scene.background ?? tl.background ?? '#F7F8FA', overflow: 'hidden', ...wrapper}}>
+		<AbsoluteFill data-scene={scene.id} style={{background: scene.background ?? tl.background ?? (ctx.brand ? brand.white : '#F7F8FA'), overflow: 'hidden', ...wrapper}}>
 			<div
 				style={{
 					position: 'absolute',
@@ -51,9 +55,10 @@ const SceneLayer: React.FC<{
 					transform: camTransform(cam, tl.width, tl.height),
 				}}
 			>
-				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="elements" />
-				<SceneContent resolved={resolved} ctx={ctx} t={t} layer="hands" hand={tl.hand} />
+				<SceneContent resolved={artwork} ctx={ctx} t={t} layer="elements" />
+				{!hideHands && <SceneContent resolved={artwork} ctx={ctx} t={t} layer="hands" penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />}
 			</div>
+			{overlay.length > 0 && <SceneContent resolved={overlay} ctx={ctx} t={t} layer="elements" />}
 		</AbsoluteFill>
 	);
 };
@@ -63,17 +68,25 @@ const elementBounds = (scene: Scene, id: string | undefined, ctx: Ctx, t: number
 	const el = scene.elements.find((e) => e.id === id);
 	if (!el) return null;
 	const r = resolveElement(el, scene, ctx);
-	const s = computeState(r, t, ctx.fps);
+	const {state: s} = animateCarry(r, t, ctx.fps);
 	const b = r.geom.box;
 	const c = toScene(s, {x: b.ox + b.w / 2, y: b.oy + b.h / 2});
 	return {x: c.x, y: c.y, w: b.w * s.scale, h: b.h * s.scale};
+};
+
+/** Both clipped scenes use one shared seam in screen pixels throughout the push. */
+export const SceneSlideLeft = (p: number, width: number, incoming: boolean) => {
+	const seam = Number(((1 - easeInOut(p)) * width).toFixed(2));
+	return `translateX(${incoming ? seam : seam - width}px)`;
 };
 
 export const SceneStack: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: boolean}> = ({tl, ctx, t, fontsOk}) => {
 	const scenes = sortedScenes(tl);
 	const W = tl.width;
 	const H = tl.height;
-	const trs = scenes.map((s, i) => normTransition(s, i, tl.style));
+	const trs = scenes.map((s, i) => tl.sceneSlideLeft && i > 0
+		? normTransition({...s, transitionIn: {type: 'push-left', duration: s.transitionIn?.duration ?? 0.8}}, i, tl.style)
+		: normTransition(s, i, tl.style));
 	const layers: React.ReactNode[] = [];
 	scenes.forEach((scene, i) => {
 		const visStart = i === 0 ? -Infinity : scene.start - trs[i].d;
@@ -82,18 +95,20 @@ export const SceneStack: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: b
 		const wrapper: React.CSSProperties = {};
 		const transforms: string[] = [];
 		let cam = cameraAt(scene.camera, t, DEFAULT_CAM);
+		let transitioning = false;
 
 		// ---- scene đang vào
 		const tin = trs[i];
 		if (tin.d > 0 && t < scene.start) {
 			const p = progress(t, visStart, tin.d);
+			transitioning = true;
 			switch (tin.type) {
 				case 'fade':
 					wrapper.opacity = easeInOut(p);
 					break;
 				case 'push-left':
 				case 'pan':
-					transforms.push(`translateX(${((1 - easeInOut(p)) * W).toFixed(2)}px)`);
+					transforms.push(SceneSlideLeft(p, W, true));
 					break;
 				case 'push-up':
 					transforms.push(`translateY(${((1 - easeInOut(p)) * H).toFixed(2)}px)`);
@@ -112,10 +127,11 @@ export const SceneStack: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: b
 			const tn = trs[i + 1];
 			if (tn.d > 0 && t >= next.start - tn.d) {
 				const q = progress(t, next.start - tn.d, tn.d);
+				transitioning = true;
 				switch (tn.type) {
 					case 'push-left':
 					case 'pan':
-						transforms.push(`translateX(${(-easeInOut(q) * W).toFixed(2)}px)`);
+						transforms.push(SceneSlideLeft(q, W, false));
 						break;
 					case 'push-up':
 						transforms.push(`translateY(${(-easeInOut(q) * H).toFixed(2)}px)`);
@@ -142,7 +158,7 @@ export const SceneStack: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: b
 			wrapper.transformOrigin = '50% 50%';
 		}
 		layers.push(
-			<SceneLayer key={scene.id} scene={scene} tl={tl} ctx={ctx} t={t} fontsOk={fontsOk} wrapper={wrapper} cam={cam} />,
+			<SceneLayer key={scene.id} scene={scene} tl={tl} ctx={ctx} t={tl.sceneSlideLeft ? Math.max(t, scene.start) : t} fontsOk={fontsOk} wrapper={wrapper} cam={cam} hideHands={Boolean(tl.sceneSlideLeft && transitioning)} />,
 		);
 	});
 	return <>{layers}</>;
@@ -163,7 +179,7 @@ const BoardScene: React.FC<{
 	const resolved = useResolvedScene(scene, ctx, fontsOk);
 	return (
 		<div style={{position: 'absolute', left: origin.x, top: origin.y, width: tl.width, height: tl.height}}>
-			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} hand={tl.hand} />
+			<SceneContent resolved={resolved} ctx={ctx} t={t} layer={layer} penTravel={scene.penTravel} hand={tl.hand} carryHand={tl.carryHand} />
 		</div>
 	);
 };
@@ -243,7 +259,7 @@ export const Board: React.FC<{tl: Timeline; ctx: Ctx; t: number; fontsOk: boolea
 	const tile = 256 * cam.scale;
 	const noiseOn = tl.paperNoise ?? true;
 	return (
-		<AbsoluteFill style={{background: tl.background ?? '#FCFCFA', overflow: 'hidden'}}>
+		<AbsoluteFill style={{background: tl.background ?? (ctx.brand ? brand.white : '#FCFCFA'), overflow: 'hidden'}}>
 			{noise && noiseOn ? (
 				<>
 					<Img src={noise} style={{position: 'absolute', width: 1, height: 1, opacity: 0}} />

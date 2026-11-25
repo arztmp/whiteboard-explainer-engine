@@ -5,6 +5,8 @@ export type Style = 'A' | 'B' | 'C';
 
 export type EnterType =
 	| 'pop'
+	| 'slide'
+	| 'rotate'
 	| 'slide-up'
 	| 'slide-left'
 	| 'slide-right'
@@ -36,6 +38,8 @@ export interface CameraKey {
 }
 
 export interface Move {
+	via?: Vec;
+	z?: number;
 	at: number;
 	x?: number;
 	y?: number;
@@ -60,18 +64,51 @@ export interface TransitionIn {
 	dip?: number;
 }
 
+export interface Carry {
+	mode?: 'carry' | 'drag';
+	/** Per-carry override for a calibrated background hand. */
+	handScale?: number;
+	after?: Move[];
+	/** Scene-local positions. The target is the element anchor, grip is relative to that anchor. */
+	grip: Vec;
+	from: Vec;
+	to: Vec;
+	target: Vec;
+	lift?: number;
+	/** Absolute timeline seconds. */
+	start: number;
+	contact: number;
+	pickup: number;
+	land: number;
+	release: number;
+	end: number;
+}
+
+export type FadeCurve = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
 interface BaseElement {
+	screenFixed?: boolean;
+	/** Optional CSS drop-shadow for legibility over a picture. */
+	inkShadow?: string;
 	id: string;
 	x?: number;
 	y?: number;
 	enterAt?: number;
 	enter?: EnterType;
 	enterDuration?: number;
+	enterOffset?: Vec;
+	enterAngle?: number;
+	enterScale?: number;
+	growOrigin?: Vec;
+	enterCurve?: FadeCurve;
+	exitCurve?: FadeCurve;
+	zoom?: {at: number; in: number; hold?: number; out: number; scale: number; origin?: Vec};
 	hand?: boolean;
 	exitAt?: number;
 	exit?: ExitType;
 	exitDuration?: number;
 	moves?: Move[];
+	carry?: Carry;
 	/** mở rộng: opacity/scale/rotate gốc, z-index */
 	opacity?: number;
 	scale?: number;
@@ -82,6 +119,10 @@ interface BaseElement {
 }
 
 export interface ImageElement extends BaseElement {
+	/** Raster painting is driven by plain scene-coordinate pen paths. */
+	penPaint?: boolean;
+	role?: 'background';
+	fitImage?: 'contain' | 'cover';
 	type: 'image';
 	src: string;
 	w: number;
@@ -92,6 +133,10 @@ export interface ImageElement extends BaseElement {
 	flipX?: boolean;
 	/** khi enter = draw: vẽ theo trace map <src>.trace.png/.trace.json (tạo offline) */
 	trace?: boolean;
+	illustration?: {regions: {d: string; at: number; end: number}[]};
+	reveal?: {rows?: number};
+	scatter?: {at: number; out: number; hold?: number; back: number; columns?: number; rows?: number;
+		direction?: Vec; returnDirection?: Vec; rotation?: number; fade?: number};
 	/** đoạn video thật (ghi màn hình…) phát trong khung ảnh, bắt đầu lúc enterAt; `src` là khung đại diện để lấy kích thước */
 	video?: string;
 	videoRate?: number;
@@ -101,6 +146,8 @@ export type FontKind = 'sans' | 'hand';
 
 export interface TextElement extends BaseElement {
 	type: 'text';
+	mode?: 'typography';
+	letterSpacing?: number;
 	text: string;
 	size?: number;
 	weight?: number;
@@ -186,6 +233,8 @@ export interface BarElement extends BaseElement {
 }
 
 export interface PathElement extends BaseElement {
+	paintFor?: {imageId: string; phase: 'outline' | 'detail' | 'color'};
+	inkFade?: {at: number; end: number};
 	type: 'path';
 	d: string;
 	stroke?: string;
@@ -255,7 +304,31 @@ export interface ClockElement extends BaseElement {
 	accent?: string;
 }
 
+/** Matched closed contour vertices in local pixels, ordered in the same winding direction. */
+export interface MorphElement extends BaseElement {
+	toFill?: string;
+	type: 'morph';
+	x: number;
+	y: number;
+	from: Vec[];
+	to: Vec[];
+	at: number;
+	duration: number;
+	fill?: string;
+}
+
+export interface FormulaElement extends BaseElement {
+	type: 'formula';
+	latex: string;
+	x: number;
+	y: number;
+	size?: number;
+	color?: string;
+}
+
 export type TimelineElement =
+	| FormulaElement
+	| MorphElement
 	| ImageElement
 	| TextElement
 	| CounterElement
@@ -266,7 +339,19 @@ export type TimelineElement =
 	| ClockElement
 	| CaptionElement;
 
+export interface PenTravel {
+	lift?: boolean;
+	scale?: number;
+	/** Absolute timeline seconds and scene coordinates at the offscreen endpoints. */
+	start: number;
+	end: number;
+	from: Vec;
+	to: Vec;
+}
+
 export interface Scene {
+	/** Smooth entry, pen-up moves between path strokes, and exit. */
+	penTravel?: PenTravel;
 	id: string;
 	start: number;
 	end: number;
@@ -306,6 +391,12 @@ export interface HandConfig {
 }
 
 export interface Timeline {
+	/** Opt in when replaying an archived strip or timed raster fill. */
+	allowLegacyRasterEffects?: boolean;
+	/** Retained for legacy acceptance scenes only. */
+	allowMorph?: boolean;
+	/** Accepts historical multidirectional background carries in the original regression fixture. */
+	allowLegacyBackgroundPlacement?: boolean;
 	style: Style;
 	fps: number;
 	width: number;
@@ -321,6 +412,8 @@ export interface Timeline {
 	hud?: Hud | null;
 	background?: string;
 	hand?: HandConfig | null;
+	/** Optional sprite grid ordered left-to-right from open fingers to a closed grip. */
+	carryHand?: (HandConfig & {grid?: {columns: number; rows: number}}) | null;
 	board?: {width: number; height: number} | null;
 	/** mở rộng: chữ mặc định 'sans' (A/B) hoặc 'hand' (C) */
 	font?: FontKind;
@@ -336,6 +429,8 @@ export interface Timeline {
 	bowing?: number;
 	/** mở rộng: tự co chữ vừa khung cho label rect/circle, title/body card, text có maxWidth (mặc định false) */
 	fitText?: boolean;
+	sceneSlideLeft?: boolean;
+	theme?: 'brand';
 	scenes: Scene[];
 }
 

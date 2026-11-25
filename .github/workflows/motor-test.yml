@@ -1,0 +1,127 @@
+name: Motor acceptance test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/motor-acceptance, codex/motor-refinements, codex/draw-effects, codex/draw-contact-cleanup]
+
+permissions:
+  contents: read
+
+jobs:
+  motor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Python and run tests
+        run: |
+          python -m pip install --timeout 15 --retries 2 -r requirements.txt
+          python -m pytest -q
+      - name: Install video tools and select Chromium
+        run: |
+          if ! command -v ffmpeg || ! command -v ffprobe || [ ! -x /usr/bin/time ]; then
+            apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+            if ! sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time; then
+              sudo apt-get "${apt_options[@]}" update
+              sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time
+            fi
+          fi
+          browser=$(command -v google-chrome || command -v chromium)
+          printf 'CHROME_PATH=%s\nARTIFACT_DIR=%s\n' "$browser" "$RUNNER_TEMP/Motor_Test" >> "$GITHUB_ENV"
+      - name: Install studio and check TypeScript
+        working-directory: studio
+        run: |
+          npm ci
+          npm run typecheck
+      - name: Compile acceptance and previous fixture timelines
+        run: |
+          python scripts/build-motor-test.py
+          python scripts/build-animation-demo.py
+          python scripts/build-professional-demo.py
+      - name: Verify hand placement, formulas and acceptance animation
+        working-directory: studio
+        run: node scripts/verify-motor-test.cjs "$ARTIFACT_DIR"
+      - name: Verify existing animation and handwriting regressions
+        working-directory: studio
+        run: |
+          node scripts/verify-hand-motion.cjs "$ARTIFACT_DIR/regression/hand"
+          node scripts/verify-animation-demo.cjs "$ARTIFACT_DIR/regression/effects"
+          node scripts/verify-professional-draw.cjs "$ARTIFACT_DIR/regression/drawing"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          import numpy as np
+          from PIL import Image
+          p = Path(os.environ["ARTIFACT_DIR"]) / "regression/drawing"
+          a = Image.open(p/"original-comparison.png")
+          b = Image.open(p/"registered-original.png")
+          report = json.loads((p/"browser-verification.json").read_text())
+          assert all(np.array_equal(np.asarray(a.crop(v[0])),np.asarray(b.crop(v[0]))) for v in report["pixelRects"].values())
+          PY
+      - name: Verify targeted refinements in Chromium
+        if: github.ref_name == 'codex/motor-refinements' || (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
+        run: |
+          python scripts/build-motor-refinements.py
+          cd studio
+          node scripts/verify-motor-test.cjs "$ARTIFACT_DIR" refinements
+      - name: Verify drawing paths and source pixels
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
+        run: |
+          python scripts/build-draw-test.py
+          (cd studio && node scripts/verify-motor-test.cjs "$ARTIFACT_DIR" draw)
+          python scripts/verify-draw-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt" pixels
+      - name: Render drawing acceptance in Full HD
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
+        working-directory: studio
+        run: |
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt" \
+            npm run render -- C "$ARTIFACT_DIR/Draw_Test.mp4" \
+            --props='{"videoId":"motor-demo","timelineFile":"draw-test.json"}' \
+            --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
+      - name: Package drawing acceptance
+        if: (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup')
+        run: |
+          python scripts/verify-draw-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt"
+          git diff --name-only origin/codex/motor-refinements...HEAD > "$ARTIFACT_DIR/changed-files.txt"
+          if [[ "$GITHUB_REF_NAME" == codex/draw-contact-cleanup ]]; then
+            git diff --name-only origin/codex/draw-effects...HEAD > "$ARTIFACT_DIR/changed-files.txt"
+          fi
+          cp docs/draw-effects.md "$ARTIFACT_DIR/status.md"
+          printf '%s\n' 'PASS: Python tests, TypeScript, previous motor acceptance, hand motion, effects, professional drawing, PNG/SVG pixel comparison, and targeted refinements.' > "$ARTIFACT_DIR/regression-status.txt"
+          find "$ARTIFACT_DIR/regression" -type f -printf '%P\n' | sort > "$ARTIFACT_DIR/regression-files.txt"
+      - name: Render Motor Test in Full HD
+        if: github.ref_name != 'codex/draw-effects' && github.ref_name != 'codex/draw-contact-cleanup'
+        working-directory: studio
+        run: |
+          timeline=timeline.json
+          if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then timeline=refinements.json; fi
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/motor-performance.txt"             npm run render -- C "$ARTIFACT_DIR/Motor_Test.mp4"             --props="{\"videoId\":\"motor-demo\",\"timelineFile\":\"$timeline\"}"             --browser-executable="$CHROME_PATH" --concurrency=75% --timeout=120000
+      - name: Decode video and package the acceptance reports
+        if: github.ref_name != 'codex/draw-effects' && github.ref_name != 'codex/draw-contact-cleanup'
+        run: |
+          if [[ "$GITHUB_REF_NAME" == codex/motor-refinements ]]; then
+            python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt" refinements
+            cp docs/motor-refinements.md "$ARTIFACT_DIR/status.md"
+          else
+            python scripts/verify-motor-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/motor-performance.txt"
+            cp docs/motor-acceptance.md "$ARTIFACT_DIR/status.md"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ (github.ref_name == 'codex/draw-effects' || github.ref_name == 'codex/draw-contact-cleanup') && 'Draw_Test' || 'Motor_Test' }}
+          path: ${{ runner.temp }}/Motor_Test
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

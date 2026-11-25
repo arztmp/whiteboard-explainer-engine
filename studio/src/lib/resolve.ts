@@ -1,3 +1,4 @@
+import {revealAt} from './image-effects';
 // Chuẩn hoá element: điền giá trị mặc định theo style, tính hình học (box, đầu bút).
 import type {
 	EnterType,
@@ -32,6 +33,7 @@ import {
 } from './rough';
 
 export interface Ctx {
+	brand?: boolean;
 	videoId: string;
 	style: Style;
 	fps: number;
@@ -176,9 +178,16 @@ const computeGeometry = (el: TimelineElement, font: FontKind, ctx: Ctx): Geometr
 	const y = el.y ?? 0;
 	const center = (w: number, h: number): Box => ({ox: -w / 2, oy: -h / 2, w, h});
 	switch (el.type) {
+		case 'formula':
+		case 'morph':
+			return {box: center(1, 1), anchor: {x, y}, tipAt: () => ({x: 0, y: 0})};
 		case 'image': {
 			const size = imageSizeOf(ctx, el.src, el.w, el.h);
 			const box = center(size.w, size.h);
+			if (el.reveal) return {box, anchor: {x, y}, imageSize: size, tipAt: (p) => {
+				const tip = revealAt(p, el.reveal!.rows ?? 8);
+				return {x: (el.flipX ? 1 - tip.x : tip.x) * size.w + box.ox, y: tip.y * size.h + box.oy};
+			}};
 			const sc = getScribble(size.w, size.h, el.id);
 			const trace = el.trace ? ctx.traces[resolveAsset(ctx.videoId, el.src)] : undefined;
 			if (trace) {
@@ -227,7 +236,7 @@ const computeGeometry = (el: TimelineElement, font: FontKind, ctx: Ctx): Geometr
 				const fit = fitBlocks([{text: el.text, size, weight, lineHeight: lh}], font, el.maxWidth, Infinity, 0, el.maxLines ?? 2);
 				size = fit.blocks[0].size;
 			}
-			const lay = layoutText(el.text, size, weight, font, el.maxWidth, lh);
+			const lay = layoutText(el.text, size, weight, font, el.maxWidth, lh, el.letterSpacing);
 			const pad = textBoxPad(el, size);
 			const w = lay.width + pad.x * 2;
 			const h = lay.height + pad.y * 2;
@@ -458,9 +467,9 @@ export const resolveElement = (
 ): Resolved => {
 	const isC = ctx.style === 'C';
 	const font: FontKind =
-		('font' in el && el.font) || ctx.defaultFont;
+		('font' in el && el.font) || (el.type === 'text' && el.mode === 'typography' ? 'sans' : ctx.defaultFont);
 	const enter: EnterType =
-		el.enter ??
+		el.enter ?? (el.type === 'text' && el.mode === 'typography' ? 'none' : undefined) ??
 		(isC && DRAWABLE_DEFAULT_C
 			? 'draw'
 			: el.type === 'bar'
@@ -470,7 +479,7 @@ export const resolveElement = (
 					: 'fade');
 	// Style A: không bao giờ hiện tay. Style C: mặc định có tay.
 	const hand =
-		enter === 'draw' &&
+		enter === 'draw' && !(el.type === 'text' && el.mode === 'typography') &&
 		(ctx.style === 'A' ? false : (el.hand ?? (isC ? true : false)));
 	const geom = computeGeometry(el, font, ctx);
 	const defaultDur =

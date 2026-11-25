@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="450" viewBox="0 0 1120 450">
+  <g stroke="#222B39" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(40 48)">
+      <polygon points="25,135 120,18 212,135" fill="#E88728"/>
+      <circle cx="112" cy="253" r="68" fill="#36DDE4"/>
+    </g>
+    <g transform="translate(325 24) rotate(-8 114 166)">
+      <rect x="20" y="96" width="208" height="158" rx="13" fill="#F2EDE0"/>
+      <polyline fill="none" points="43,220 84,164 125,194 154,140 196,176"/>
+      <ellipse cx="123" cy="302" rx="74" ry="29" fill="#92979B"/>
+    </g>
+    <g transform="translate(639 44)">
+      <path fill="#E88728" d="M22 151 L184 18 L350 151 Z"/>
+      <path fill="#F2EDE0" fill-rule="evenodd" d="M52 152H318V328H52Z M91 190H155V248H91Z"/>
+      <rect x="199" y="218" width="58" height="110" rx="4" fill="#36DDE4"/>
+      <line x1="112" y1="342" x2="290" y2="342"/>
+      <circle cx="243" cy="276" r="6" fill="#D90000"/>
+    </g>
+  </g>
+</svg>

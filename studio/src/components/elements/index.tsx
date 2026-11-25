@@ -1,3 +1,4 @@
+import brand from '../../theme.json';
 import React, {useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
 import {cancelRender, continueRender, delayRender, Img, OffthreadVideo, Sequence, useVideoConfig} from 'remotion';
 import {composeTrace, getTracePixelsSync, loadTracePixels, traceUrls} from '../../lib/trace';
@@ -125,7 +126,7 @@ export const ImageView: React.FC<ElProps<ImageElement>> = ({r, s, ctx}) => {
 			) : (
 				<Img
 					src={url}
-					style={{position: 'absolute', left: 0, top: 0, width: w, height: h, opacity: solid, transform: flip}}
+					style={{position: 'absolute', left: 0, top: 0, width: w, height: h, objectFit: el.fitImage, opacity: solid, transform: flip}}
 				/>
 			)}
 			{drawing && traced ? (
@@ -225,7 +226,7 @@ export const TextView: React.FC<ElProps<TextElement>> = ({r, s, ctx}) => {
 	const size = lay.size;
 	const weight = el.weight ?? 600;
 	const align = el.align ?? 'center';
-	const color = el.color ?? INK;
+	const color = el.color ?? (el.mode === 'typography' || ctx.brand ? brand.navy : INK);
 	const p = s.draw;
 	// phân bổ tiến độ vẽ theo độ dài từng dòng
 	const total = lay.lines.reduce((a, l) => a + Math.max(l.width, 1), 0);
@@ -272,6 +273,7 @@ export const TextView: React.FC<ElProps<TextElement>> = ({r, s, ctx}) => {
 							height: lay.lineHeight,
 							lineHeight: `${lay.lineHeight}px`,
 							whiteSpace: 'pre',
+							letterSpacing: el.letterSpacing,
 							fontFamily: fontFamily(r.font),
 							fontSize: size,
 							fontWeight: weight,
@@ -671,7 +673,7 @@ const RoughPathView: React.FC<ElProps<PathElement>> = ({r, s}) => {
 	);
 };
 
-const PlainPathView: React.FC<ElProps<PathElement>> = ({r, s}) => {
+const PlainPathView: React.FC<ElProps<PathElement>> = ({r, s, ctx}) => {
 	const el = r.el;
 	const info = r.geom.path!;
 	const maskId = useSafeId('pm');
@@ -680,7 +682,7 @@ const PlainPathView: React.FC<ElProps<PathElement>> = ({r, s}) => {
 	const L = info.length;
 	const p = s.draw ?? 1;
 	const sw = el.strokeWidth ?? 6;
-	const stroke = el.stroke ?? INK;
+	const stroke = el.stroke ?? (ctx.brand ? brand.navy : INK);
 	const dash = el.dashed ? `${sw * 2.2} ${sw * 1.8}` : undefined;
 	const drawing = s.draw !== null && p < 1;
 	let arrow: string | null = null;
@@ -730,15 +732,15 @@ const PlainPathView: React.FC<ElProps<PathElement>> = ({r, s}) => {
 };
 
 // ---------------------------------------------------------------- rect / circle
-export const ShapeView: React.FC<ElProps<ShapeElement>> = ({r, s}) => {
+export const ShapeView: React.FC<ElProps<ShapeElement>> = ({r, s, ctx}) => {
 	const el = r.el;
 	const box = r.geom.box;
 	const outline = r.geom.outline!;
 	const p = s.draw;
 	const drawing = p !== null && p < 1;
-	const fill = el.fill ?? '#2F6FEB';
+	const fill = el.fill ?? (ctx.brand ? brand.cream : '#2F6FEB');
 	const sw = el.strokeWidth ?? (el.stroke ? 4 : 5);
-	const stroke = el.stroke ?? (drawing ? fill : null);
+	const stroke = el.stroke ?? (ctx.brand ? brand.navy : drawing ? fill : null);
 	const fillOp = p === null ? 1 : clamp((p - 0.55) / 0.45, 0, 1);
 	const labelOp = p === null ? 1 : clamp((p - 0.7) / 0.3, 0, 1);
 	const L = outline.length;
@@ -788,7 +790,7 @@ export const ShapeView: React.FC<ElProps<ShapeElement>> = ({r, s}) => {
 						fontFamily: fontFamily(r.font),
 						fontSize: fitted.size,
 						fontWeight: el.labelWeight ?? 600,
-						color: el.labelColor ?? '#FFFFFF',
+						color: el.labelColor ?? (ctx.brand ? brand.navy : '#FFFFFF'),
 						lineHeight: 1.2,
 						whiteSpace: 'pre',
 						opacity: labelOp,
@@ -814,7 +816,7 @@ export const ShapeView: React.FC<ElProps<ShapeElement>> = ({r, s}) => {
 						fontFamily: fontFamily(r.font),
 						fontSize: el.labelSize ?? 32,
 						fontWeight: el.labelWeight ?? 600,
-						color: el.labelColor ?? '#FFFFFF',
+						color: el.labelColor ?? (ctx.brand ? brand.navy : '#FFFFFF'),
 						lineHeight: 1.2,
 						opacity: labelOp,
 					}}

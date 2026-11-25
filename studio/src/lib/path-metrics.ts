@@ -4,6 +4,7 @@ export interface PathInfo {
 	length: number;
 	bbox: {x: number; y: number; w: number; h: number};
 	pointAt: (l: number) => Vec;
+	exactPointAt: (l: number) => Vec;
 }
 
 const cache = new Map<string, PathInfo>();
@@ -14,7 +15,7 @@ export const getPathInfo = (d: string): PathInfo => {
 	const hit = cache.get(d);
 	if (hit) return hit;
 	if (typeof document === 'undefined') {
-		return {length: 0, bbox: {x: 0, y: 0, w: 0, h: 0}, pointAt: () => ({x: 0, y: 0})};
+		return {length: 0, bbox: {x: 0, y: 0, w: 0, h: 0}, pointAt: () => ({x: 0, y: 0}), exactPointAt: () => ({x: 0, y: 0})};
 	}
 	if (!svgRoot) {
 		svgRoot = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -41,6 +42,7 @@ export const getPathInfo = (d: string): PathInfo => {
 	const info: PathInfo = {
 		length,
 		bbox: {x: b.x, y: b.y, w: b.width, h: b.height},
+		exactPointAt: (l) => el.getPointAtLength(l),
 		pointAt: (l: number) => {
 			if (length <= 0) return samples[0];
 			const f = (Math.min(length, Math.max(0, l)) / length) * N;

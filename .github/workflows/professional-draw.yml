@@ -1,0 +1,76 @@
+name: Professional handwriting and illustration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/illustration-draw]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Python test dependencies and run regressions
+        run: |
+          python -m pip install --timeout 15 --retries 2 -r requirements.txt
+          python -m pytest -q
+      - name: Install FFmpeg and select Chromium
+        run: |
+          if ! command -v ffmpeg || ! command -v ffprobe || [ ! -x /usr/bin/time ]; then
+            apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+            if ! sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time; then
+              sudo apt-get "${apt_options[@]}" update
+              sudo apt-get "${apt_options[@]}" install --no-install-recommends -y ffmpeg time
+            fi
+          fi
+          browser=$(command -v google-chrome || command -v chromium)
+          printf 'CHROME_PATH=%s\nARTIFACT_DIR=%s\n' "$browser" "$RUNNER_TEMP/professional-draw" >> "$GITHUB_ENV"
+      - name: Install Remotion and check TypeScript
+        working-directory: studio
+        run: |
+          npm ci
+          npm run typecheck
+      - name: Compile writing and illustration plans
+        run: |
+          python scripts/build-animation-demo.py
+          python scripts/build-professional-demo.py
+      - name: Recheck previous hand animation and comprehensive effects
+        working-directory: studio
+        run: |
+          node scripts/verify-hand-motion.cjs "$ARTIFACT_DIR/regression/three-hand-motions"
+          node scripts/verify-animation-demo.cjs "$ARTIFACT_DIR/regression/full-animation"
+      - name: Measure pen contact, travel, regions and transitions
+        working-directory: studio
+        run: node scripts/verify-professional-draw.cjs "$ARTIFACT_DIR"
+      - name: Render 118-second Full HD demo
+        working-directory: studio
+        run: |
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/professional-metrics.txt" \
+            npm run render -- C "$ARTIFACT_DIR/professional-draw.mp4" \
+            --props='{"videoId":"professional-draw","timelineFile":"timeline.json"}' \
+            --browser-executable="$CHROME_PATH" --concurrency=2 --timeout=120000
+      - name: Validate media and build QA package
+        run: |
+          python scripts/verify-professional-media.py "$ARTIFACT_DIR" "$RUNNER_TEMP/professional-metrics.txt"
+          cp docs/professional-draw-status.md "$ARTIFACT_DIR/feature-status.md"
+      - name: Upload demo and verification reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: professional-draw
+          path: ${{ runner.temp }}/professional-draw
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

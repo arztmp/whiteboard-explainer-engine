@@ -1,0 +1,192 @@
+{
+  "style": "C",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 15,
+  "background": "#FAF8EF",
+  "paperNoise": true,
+  "noiseStatic": true,
+  "font": "sans",
+  "hand": {
+    "src": "common/hand.png",
+    "tip": {
+      "x": 2,
+      "y": 9
+    },
+    "scale": 0.55
+  },
+  "carryHand": {
+    "src": "hand.webp",
+    "tip": {
+      "x": 63.333333333333336,
+      "y": 127.33333333333333
+    },
+    "scale": 1.17,
+    "grid": {
+      "columns": 4,
+      "rows": 4
+    }
+  },
+  "scenes": [
+    {
+      "id": "carry",
+      "start": 0,
+      "end": 15,
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "elements": [
+        {
+          "id": "overline",
+          "type": "text",
+          "text": "WHITEBOARD EXPLAINER ENGINE",
+          "x": 960,
+          "y": 126,
+          "size": 24,
+          "color": "#176D69",
+          "enter": "none",
+          "enterAt": 0,
+          "weight": 700
+        },
+        {
+          "id": "title",
+          "type": "text",
+          "text": "Elle nesne taşıma",
+          "x": 960,
+          "y": 225,
+          "size": 78,
+          "color": "#172B37",
+          "enter": "draw",
+          "enterAt": 0.45,
+          "weight": 700,
+          "enterDuration": 1.7,
+          "hand": true
+        },
+        {
+          "id": "rule",
+          "type": "rect",
+          "x": 960,
+          "y": 330,
+          "w": 1480,
+          "h": 2,
+          "fill": "#D8E1DA",
+          "stroke": "none",
+          "enter": "none",
+          "enterAt": 0
+        },
+        {
+          "id": "left-tag",
+          "type": "text",
+          "text": "BAŞLANGIÇ",
+          "x": 450,
+          "y": 935,
+          "size": 30,
+          "color": "#576F72",
+          "enter": "none",
+          "enterAt": 0,
+          "weight": 700
+        },
+        {
+          "id": "right-tag",
+          "type": "text",
+          "text": "HEDEF",
+          "x": 1460,
+          "y": 935,
+          "size": 30,
+          "color": "#176D69",
+          "enter": "none",
+          "enterAt": 0,
+          "weight": 700
+        },
+        {
+          "id": "start-bay",
+          "type": "rect",
+          "x": 450,
+          "y": 753,
+          "w": 252,
+          "h": 200,
+          "fill": "#E5EBE5",
+          "stroke": "#C5D6CC",
+          "enter": "none",
+          "enterAt": 0,
+          "radius": 25,
+          "strokeWidth": 3
+        },
+        {
+          "id": "finish-bay",
+          "type": "rect",
+          "x": 1460,
+          "y": 753,
+          "w": 252,
+          "h": 200,
+          "fill": "#DCEEE6",
+          "stroke": "#AFD2C3",
+          "enter": "none",
+          "enterAt": 0,
+          "radius": 25,
+          "strokeWidth": 3
+        },
+        {
+          "id": "parcel",
+          "type": "rect",
+          "x": 450,
+          "y": 753,
+          "w": 200,
+          "h": 140,
+          "fill": "#F9C461",
+          "stroke": "#9D5A29",
+          "enter": "none",
+          "enterAt": 0,
+          "radius": 18,
+          "strokeWidth": 4,
+          "rotate": -7,
+          "scale": 1.12,
+          "label": "NESNE",
+          "labelSize": 33,
+          "labelColor": "#643A29",
+          "moves": [
+            {
+              "at": 5.6,
+              "duration": 2,
+              "rotate": 8,
+              "scale": 1.18
+            },
+            {
+              "at": 7.6,
+              "duration": 2,
+              "rotate": -7,
+              "scale": 1.12
+            }
+          ],
+          "carry": {
+            "grip": {
+              "x": 90,
+              "y": -63
+            },
+            "target": {
+              "x": 1460,
+              "y": 753
+            },
+            "to": {
+              "x": 2450,
+              "y": 1370
+            },
+            "lift": 138,
+            "start": 2.65,
+            "contact": 4.7,
+            "pickup": 5.4,
+            "land": 9.7,
+            "release": 10.4,
+            "end": 13.3,
+            "from": {
+              "x": 110,
+              "y": 1520
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
