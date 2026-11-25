@@ -16,6 +16,8 @@ drawn and rendered by a pipeline I built with AI, and checked by me before it go
 | [Gemini 4 Carbon: model mạnh nhất bảng, mà Google chưa cho bạn dùng](https://youtu.be/_D273S8DKv8) | 46 scenes, 11 annotated source screenshots, every number cited on screen |
 | [Ai đã biết trước 4 ngày? Lỗ hổng PHP 9,2 điểm](https://www.youtube.com/watch?v=EGwKD2uKURk) | Documentary-style event explainer, the channel's most-watched long video |
 
+[Animation effects, parameters, and known limitations](docs/animation-engine.md)
+
 ## What it does
 
 ```yaml
