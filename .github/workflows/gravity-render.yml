@@ -1,0 +1,77 @@
+name: Gravity production render
+on:
+  push:
+    branches: [codex/gravity-render]
+permissions:
+  contents: write
+jobs:
+  gravity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 72
+    steps:
+      - uses: actions/checkout@v4
+      - name: Receive encrypted production inputs
+        shell: bash
+        run: |
+          set -eo pipefail
+          area="$RUNNER_TEMP/gravity-input"
+          mkdir -p "$area" studio/public/gravity-project
+          umask 077
+          openssl req -new -x509 -newkey rsa:3072 -nodes -days 1 -subj "/CN=Gravity-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" -keyout "$area/key.pem" -out "$area/cert.pem" 2>/dev/null
+          prefix="codex/gravity-input-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          publication="$(git hash-object -w "$area/cert.pem")"
+          tree="$(printf '100644 blob %s\tcert.pem\n' "$publication" | git mktree)"
+          commit="$(git -c user.name=github-actions -c user.email=actions@github.com commit-tree "$tree" -m 'Temporary Gravity transport public certificate')"
+          git push origin "$commit:refs/heads/$prefix-key"
+          for attempt in {1..90}; do
+            if git ls-remote --exit-code origin "refs/heads/$prefix-data" >/dev/null; then
+              git fetch --depth=1 origin "refs/heads/$prefix-data"
+              while read -r file; do git show "FETCH_HEAD:$file"; done < <(git ls-tree --name-only FETCH_HEAD | sort) > "$area/input.der"
+              openssl cms -decrypt -binary -inform DER -in "$area/input.der" -recip "$area/cert.pem" -inkey "$area/key.pem" -out "$area/input.tar"
+              tar -xf "$area/input.tar" -C studio/public/gravity-project
+              rm -f "$area/key.pem" "$area/input.der" "$area/input.tar"
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "Timed out waiting for production inputs" >&2
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install production dependencies
+        run: |
+          python -m pip install numpy pillow
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          npm ci --prefix studio
+      - name: Verify approved inputs and browser samples
+        working-directory: studio
+        shell: bash
+        run: |
+          cd public/gravity-project
+          sha256sum -c approved.sha256
+          cd ../..
+          node public/gravity-project/check-timeline.cjs "$GITHUB_WORKSPACE"
+      - name: Render complete Gravity video
+        working-directory: studio
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/Gravity"
+          time npm run render -- C "$RUNNER_TEMP/Gravity/Gravity.mp4" --props='{"videoId":"gravity-project","timelineFile":"timeline.json"}' --browser-executable="$(command -v google-chrome || command -v chromium)" --concurrency=75% --timeout=120000
+      - name: Verify final media and scene samples
+        run: python studio/public/gravity-project/check-video.py "$RUNNER_TEMP/Gravity"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gravity
+          path: ${{ runner.temp }}/Gravity
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
