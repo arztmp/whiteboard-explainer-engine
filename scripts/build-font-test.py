@@ -1,102 +1,67 @@
-"""Build a standalone comparison timeline; rendering is a separate operation."""
+"""Build the standalone writing test without rendering a video."""
 import json
 from pathlib import Path
-import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from engine.font_pen import FontPen
-from engine.handwriting import handwriting
-from engine.scientific import formula_strokes
-from engine.stroke_plan import THEME, pen_window, schedule
+from engine.formula_plan import formula_element, validate_formulas
+from engine.font_pen import FontPen, pen_writing
+from engine.stroke_plan import THEME
 
 OUTPUT = ROOT/'studio/public/font-writing-test'
-FONT = ROOT/'studio/node_modules/@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-600-normal.woff'
-TEXT = ('The Three-Body Problem', 'Gravity and Motion', '1234567890')
-INK = THEME['navy']
+FONTS = ROOT/'studio/node_modules/@fontsource/be-vietnam-pro/files'
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
-SIZE = 110
-BASELINES = (385, 570, 755)
+TEXT = ('The Three-Body Problem', 'Gravity and Motion', '1234567890')
 HAND = {"src":"/hand-motion-demo/Kalem_El.png","tip":{"x":98.5,"y":291.5},"scale":.42}
 
 
-def text(id_, value, y, size, weight=600, font='sans'):
-    return dict(id=id_, type='text', text=value, x=WIDTH/2, y=y, size=size,
-                weight=weight, font=font, color=INK, mode='typography', align='center',
-                enter='none')
-
-
-def scene(scenes, id_, title, duration):
-    start = scenes[-1]['end'] if scenes else 0
-    result = dict(id=id_, start=start, end=start+duration, background='#ffffff',
-                  transitionIn={'type':'none'}, elements=[text(id_+'-label',title,148,36)])
-    scenes.append(result)
-    return result
-
-
-def timed(s, strokes, span, targets=None):
-    start = s['start'] + 1.2
-    end = start + span
-    paths = schedule(strokes,start,end,s['id']+'-ink')
-    if targets is not None:
-        for path, image_id in zip(paths,targets,strict=True):
-            path['paintFor'] = {'imageId':image_id,'phase':'color'}
-    s['elements'].extend(paths)
-    s['penTravel'] = pen_window(start-.66,end+.65, WIDTH,HEIGHT, scale=.55)
-
-
 def main():
-    glyph_dir = OUTPUT/'glyphs'
-    glyph_dir.mkdir(parents=True, exist_ok=True)
-    scenes = []
-    for id_, family, weight, title in (
-        ('be-vietnam-400','sans',400,'Be Vietnam Pro 400'),
-        ('be-vietnam-600','sans',600,'Be Vietnam Pro 600'),
-        ('be-vietnam-800','sans',800,'Be Vietnam Pro 800'),
-        ('mali','hand',600,'Mali 600'),
-    ):
-        s = scene(scenes,id_,title,5)
-        for i,(line,baseline) in enumerate(zip(TEXT,BASELINES)):
-            s['elements'].append(text(f'{id_}-{i}',line,baseline-37,SIZE,weight,family))
-    s = scene(scenes,'glyphs','GLYPHS · pen strokes',32)
-    strokes = []
-    for line, baseline in zip(TEXT,BASELINES):
-        _, metrics = handwriting(line,0,baseline,SIZE)
-        x = (WIDTH-metrics['lines'][0]['width'])/2
-        row,_ = handwriting(line,x,baseline,SIZE,width=7.5,color=INK)
-        strokes.extend(row)
-    timed(s,strokes,26)
+    scenes=[]
+    def scene(id_,duration):
+        start = scenes[-1]['end'] if scenes else 0
+        s=dict(id=id_,start=start,end=start+duration,background='#ffffff',
+               transitionIn={'type':'none'},elements=[])
+        scenes.append(s)
+        return s
 
-    s = scene(scenes,'be-vietnam-pen','Be Vietnam Pro 600 · pen strokes',32)
-    font = FontPen(FONT,INK)
-    strokes, targets = [], []
-    for line,baseline in zip(TEXT,BASELINES):
-        for char,svg,(x,y,w,h),routes in font.line(line,WIDTH/2,baseline,SIZE):
-            name = f'u{ord(char):04x}.svg'
-            (glyph_dir/name).write_text(svg,encoding='utf-8')
-            element_id = f'{s["id"]}-glyph-{len(s["elements"]):02d}'
-            s['elements'].append(dict(id=element_id,type='image',src=f'glyphs/{name}',penPaint=True,
-                                      x=x+w/2,y=y+h/2,w=w,h=h,enter='none'))
-            strokes.extend(routes)
-            targets.extend([element_id]*len(routes))
-    timed(s,strokes,26,targets)
+    def rows(lines,size,baselines=(360,545,730),center=960):
+        return [(expr,center,y,size) for expr,y in zip(lines,baselines,strict=True)]
 
-    s = scene(scenes,'formula','Mathematical notation · pen strokes',19)
-    equation = ('row','F','=','G',('fraction',('row',('sub','m','1'),('sub','m','2')),('sup','r','2')))
-    strokes = formula_strokes(equation,0,0,162,color=INK,width=8)
-    # The function returns already positioned strokes, so keep formula spacing
-    # and use its glyph control bounds to center the whole expression.
-    points = [tuple(map(float,pair)) for stroke in strokes
-              for pair in re.findall(r'(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)',stroke.d)]
-    xs,ys = zip(*points)
-    x,y = (WIDTH-min(xs)-max(xs))/2, (HEIGHT-min(ys)-max(ys))/2+25
-    timed(s,formula_strokes(equation,x,y,162,color=INK,width=8),13)
+    def write(id_,font,rows_,seconds,*,speed=1):
+        s=scene(id_,seconds/speed+5)
+        start=s['start']+1.2
+        s['elements'],s['penTravel']=pen_writing(font,rows_,asset_dir=OUTPUT/'glyphs',
+            asset_prefix='glyphs',id_prefix=id_,start=start,end=start+seconds,speed=speed)
+        # Keep the scene boundaries on native frame boundaries.
+        s['end']=round(s['end']*FPS)/FPS
 
-    plan = dict(style='B',width=WIDTH,height=HEIGHT,fps=FPS,duration=scenes[-1]['end'],
-                hand=HAND,theme='brand',scenes=scenes)
-    (OUTPUT/'Motor_Test.json').write_text(json.dumps(plan,ensure_ascii=False,separators=(',',':'))+'\n',
+    body=FontPen.be_vietnam(FONTS)
+    title=FontPen.be_vietnam(FONTS,weight=600)
+    blue=FontPen.be_vietnam(FONTS,color='#184c72')
+    write('title-600',title,rows((TEXT[0],),120,(565,)),12)
+    write('body-400',body,rows(TEXT,110),29)
+    write('latin',body,rows(('ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz','0123456789'),91),34)
+    write('turkish-german',blue,rows(('ÇĞİÖŞÜ çğıöşü','ÄÖÜ äöü ß ẞ','İğne, ölçü! Grüße?'),105),28,speed=1.15)
+    write('punctuation',body,rows(('.,:;!? … – —','“Text” (x) [y] {z}','# % & @ * / \\ | _ $ € ^ ~ `'),96),27)
+    write('greek',body,rows(('ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ','αβγδεζηθικλμνξοπρστυφχψως','µ ϕ ϑ ϖ'),94),34)
+    write('symbols',body,rows(('+ − × ÷ ± = ≈ ≠ < > ≤ ≥','∞ √ ∑ ∏ ∫ ∂ ∇ ° ·','→ ↔ ∝ ∈ ∅ ⊥ ′ ″'),99),29)
+    formula=('row','F = G',('fraction',('row',('sub','m','1'),('sub','m','2')),('sup','r','2')))
+    root=('row','x =',('root',('row',('sup','a','2'),' + ',('sup','b','2'))))
+    write('formula-400',body,rows((formula,root),131,(385,780)),23)
+    s=scene('katex-formulas',13)
+    for i,(latex,y) in enumerate((
+        (r'F = G \frac{m_1m_2}{r^2}', 255),
+        (r'\int_0^L f(x)\,dx, \quad \frac{\mathrm{d}}{\mathrm{d}t}\vec{r}(t)', 525),
+        (r'\sum_{n=1}^{N}\sqrt{\alpha_n^2+\beta_n^2}', 810),
+    )):
+        s['elements'].append(formula_element(f'katex-{i}',latex,x=960,y=y,size=104,
+            color=THEME['navy'],start=s['start']+1+i*2.1,duration=.7))
+    validate_formulas(scenes,ROOT/'studio')
+    timeline=dict(style='B',width=WIDTH,height=HEIGHT,fps=FPS,duration=scenes[-1]['end'],
+                  hand=HAND,theme='brand',scenes=scenes)
+    (OUTPUT/'Motor_Test.json').write_text(json.dumps(timeline,ensure_ascii=False,separators=(',',':'))+'\n',
                                           encoding='utf-8')
 
 

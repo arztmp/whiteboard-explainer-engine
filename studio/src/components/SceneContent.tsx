@@ -1,4 +1,4 @@
-import katex from 'katex';
+import {formulaMarkup} from '../lib/formula';
 import 'katex/dist/katex.min.css';
 import theme from '../theme.json';
 import {PenPaintView} from './elements/PenPaintView';
@@ -25,15 +25,6 @@ import {
 export const useResolvedScene = (scene: Scene, ctx: Ctx, fontsOk: boolean): Resolved[] =>
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	useMemo(() => scene.elements.map((el) => resolveElement(el, scene, ctx)), [scene, ctx, fontsOk]);
-
-const formulaCache = new Map<string, string>();
-const formulaMarkup = (latex: string) => {
-	const existing = formulaCache.get(latex);
-	if (existing !== undefined) return existing;
-	const html = katex.renderToString(latex, {throwOnError: true, trust: false, output: 'htmlAndMathml', maxExpand: 1000});
-	formulaCache.set(latex, html);
-	return html;
-};
 
 const ElementBody: React.FC<{r: Resolved; s: ElementState; ctx: Ctx; t: number}> = ({r, s, ctx, t}) => {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

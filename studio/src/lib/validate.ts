@@ -1,4 +1,5 @@
 import type {Timeline, TimelineElement, Vec} from '../types';
+import {formulaMarkup} from './formula';
 
 const ELEMENT_TYPES = ['formula', 'morph', 'image', 'text', 'counter', 'card', 'bar', 'path', 'rect', 'circle', 'clock', 'caption'];
 const ENTERS = ['slide', 'rotate', 'pop', 'slide-up', 'slide-left', 'slide-right', 'fade', 'draw', 'grow', 'none'];
@@ -98,6 +99,13 @@ export const validateTimeline = (tl: Timeline): string[] => {
 			}
 			for (const k of REQUIRED[e.type]) {
 				if ((e as unknown as Record<string, unknown>)[k] === undefined) errs.push(`${w}: thiếu "${k}"`);
+			}
+			if (e.type === 'formula') {
+				try {
+					formulaMarkup(e.latex);
+				} catch (error) {
+					errs.push(`${w}: invalid KaTeX formula: ${(error as Error).message}`);
+				}
 			}
 			if (e.enter && !ENTERS.includes(e.enter)) errs.push(`${w}: enter không hợp lệ (${e.enter})`);
 			if (e.exit && !EXITS.includes(e.exit)) errs.push(`${w}: exit không hợp lệ (${e.exit})`);
